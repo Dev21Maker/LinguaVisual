@@ -4,6 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/auth_service.dart';
 import 'signup_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../services/keep_signed_in_service.dart';
 
 final authServiceProvider = Provider((ref) => AuthService(SupabaseService()));
 
@@ -19,6 +21,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
+  bool _keepSignedIn = true;
+  final _keepSignedInService = KeepSignedInService();
 
   @override
   void dispose() {
@@ -34,11 +38,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     try {
       final authService = ref.read(authServiceProvider);
+      await _keepSignedInService.setKeepSignedIn(_keepSignedIn);
       await authService.signIn(
         email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
+        password: _passwordController.text.trim(), 
+        keepLoggedIn: true,
       );
-      
       // No need to navigate here as the StreamBuilder in MyApp 
       // will automatically handle navigation when auth state changes
       
@@ -117,6 +122,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       }
                       return null;
                     },
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: _keepSignedIn,
+                        onChanged: (value) {
+                          setState(() {
+                            _keepSignedIn = value ?? true;
+                          });
+                        },
+                      ),
+                      const Text('Keep me signed in'),
+                    ],
                   ),
                   const SizedBox(height: 24),
                   FilledButton(

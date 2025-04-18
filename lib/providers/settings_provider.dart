@@ -38,10 +38,12 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
   final SharedPreferences _prefs;
   static const String _nativeLanguageKey = 'nativeLanguageCode';
   static const String _targetLanguageKey = 'targetLanguageCode';
+  static const String _isDarkModeKey = 'isDarkMode';
 
   SettingsNotifier(this._prefs) : super(SettingsState(
     nativeLanguage: _getInitialNativeLanguage(_prefs),
     targetLanguage: _getInitialTargetLanguage(_prefs),
+    isDarkMode: _prefs.getBool(_isDarkModeKey) ?? false,
   ));
 
   static Language _getInitialNativeLanguage(SharedPreferences prefs) {
@@ -68,6 +70,11 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
   Future<void> setTargetLanguage(Language language) async {
     await _prefs.setString(_targetLanguageKey, language.code);
     state = state.copyWith(targetLanguage: language);
+  }
+
+  Future<void> setDarkMode(bool isDark) async {
+    await _prefs.setBool(_isDarkModeKey, isDark);
+    state = state.copyWith(isDarkMode: isDark);
   }
 }
 

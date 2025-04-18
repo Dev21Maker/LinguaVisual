@@ -1,4 +1,6 @@
 
+import 'dart:async';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/flashcard.dart';
 
@@ -100,30 +102,26 @@ class SupabaseService {
       throw Exception('User not authenticated');
     }
 
-    final now = DateTime.now().millisecondsSinceEpoch;
-    
-    final response = await _client
-        .from('cards')
-        .select()
-        .eq('user_id', userId)
-        .lte('srs_next_review_date', now)
-        .order('srs_next_review_date', ascending: true);
+    try {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      
+      final response = await _client
+          .from('cards')
+          .select()
+          .eq('user_id', userId)
+          .lte('srs_next_review_date', now)
+          .order('srs_next_review_date', ascending: true)
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () => throw TimeoutException('Failed to fetch cards: Connection timed out'),
+          );
 
-    return (response as List)
-        .map((card) => Flashcard.fromMap({
-              'id': card['id'],
-              'word': card['word'],
-              'targetLanguageCode': card['target_language_code'],
-              'translation': card['translation'],
-              'nativeLanguageCode': card['native_language_code'],
-              'imageUrl': card['image_url'],
-              'cachedImagePath': card['cached_image_path'],
-              'srsInterval': card['srs_interval'].toDouble(),
-              'srsEaseFactor': card['srs_ease_factor'].toDouble(),
-              'srsNextReviewDate': card['srs_next_review_date'],
-              'srsLastReviewDate': card['srs_last_review_date'],
-            }))
-        .toList();
+      return response.map((card) => Flashcard.fromMap(card)).toList();
+    } on TimeoutException {
+      rethrow;
+    } catch (e) {
+      throw Exception('Failed to fetch cards: $e');
+    }
   }
 
   Future<void> insertCard(Flashcard card) async {
@@ -160,9 +158,6 @@ class SupabaseService {
     if (userId == null) {
       throw Exception('User not authenticated');
     }
-    if (card.id == null) {
-      throw Exception('Card ID is required for update');
-    }
 
     final cardData = {
       'word': card.word,
@@ -181,7 +176,7 @@ class SupabaseService {
       await _client
           .from('cards')
           .update(cardData)
-          .eq('id', card.id!)
+          .eq('id', card.id)
           .eq('user_id', userId);
     } catch (e) {
       throw Exception('Failed to update card: $e');

@@ -187,3 +187,59 @@ class FlashcardViewNotifier extends StateNotifier<FlashcardViewState> {
     state = const FlashcardViewState();
   }
 }
+
+// Add this to your existing providers
+final flashcardStateProvider = StateNotifierProvider<FlashcardStateNotifier, AsyncValue<List<Flashcard>>>((ref) {
+  return FlashcardStateNotifier(ref);
+});
+
+class FlashcardStateNotifier extends StateNotifier<AsyncValue<List<Flashcard>>> {
+  final Ref ref;
+
+  FlashcardStateNotifier(this.ref) : super(const AsyncValue.loading()) {
+    _loadFlashcards();
+  }
+
+  Future<void> _loadFlashcards() async {
+    try {
+      final supabaseService = ref.read(supabaseServiceProvider);
+      final flashcardsData = await supabaseService.getFlashcards();
+      final flashcards = flashcardsData
+          .map((data) => Flashcard.fromMap(data))
+          .toList();
+      state = AsyncValue.data(flashcards);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> addFlashcard(Flashcard flashcard) async {
+    try {
+      final supabaseService = ref.read(supabaseServiceProvider);
+      await supabaseService.insertCard(flashcard);
+      await _loadFlashcards(); // Reload the flashcards after adding
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> removeFlashcard(String id) async {
+    try {
+      final supabaseService = ref.read(supabaseServiceProvider);
+      await supabaseService.deleteFlashcard(id);
+      await _loadFlashcards();
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> updateFlashcard(Flashcard flashcard) async {
+    try {
+      final supabaseService = ref.read(supabaseServiceProvider);
+      await supabaseService.updateFlashcard(flashcard.id, flashcard.toMap());
+      await _loadFlashcards();
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+}

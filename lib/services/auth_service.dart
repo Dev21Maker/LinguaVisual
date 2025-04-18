@@ -1,10 +1,22 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'supabase_service.dart';
 
 class AuthService {
   final SupabaseService _supabase;
+  static const String _keepLoggedInKey = 'keepLoggedIn';
 
   AuthService(this._supabase);
+
+  Future<void> setKeepLoggedIn(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keepLoggedInKey, value);
+  }
+
+  Future<bool> getKeepLoggedIn() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_keepLoggedInKey) ?? false;
+  }
 
   // Sign up
   Future<AuthResponse> signUp({
@@ -17,20 +29,32 @@ class AuthService {
     );
   }
 
-  // Sign in
+  // Sign in with remember me option
   Future<AuthResponse> signIn({
     required String email,
     required String password,
+    required bool keepLoggedIn,
   }) async {
-    return await _supabase.signIn(
+    final response = await _supabase.signIn(
       email: email,
       password: password,
     );
+    
+    await setKeepLoggedIn(keepLoggedIn);
+    return response;
   }
 
-  // Sign out
-  Future<void> signOut() async {
-    await _supabase.signOut();
+  // Sign out with check for keep logged in
+  Future<void> signOut({bool force = false}) async {
+    if (force) {
+      await setKeepLoggedIn(false);
+      await _supabase.signOut();
+    } else {
+      final keepLoggedIn = await getKeepLoggedIn();
+      if (!keepLoggedIn) {
+        await _supabase.signOut();
+      }
+    }
   }
 
   // Get current user
@@ -45,18 +69,19 @@ class AuthService {
   // Stream of auth changes
   Stream<AuthState> get authStateChanges => _supabase.authStateChanges;
 
-  // Initialize auth state
+  // Initialize auth state with keep logged in check
   Future<void> initializeAuthState() async {
     try {
-      // Check if there's a stored session
+      final keepLoggedIn = await getKeepLoggedIn();
       final initialSession = _supabase.currentSession;
-      if (initialSession != null) {
-        // Verify the session is still valid
+
+      if (initialSession != null && keepLoggedIn) {
         await _supabase.refreshSession();
+      } else if (initialSession != null && !keepLoggedIn) {
+        await signOut(force: true);
       }
     } catch (e) {
-      // If session refresh fails, sign out
-      await signOut();
+      await signOut(force: true);
     }
   }
 

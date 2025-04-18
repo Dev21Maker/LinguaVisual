@@ -37,7 +37,7 @@ class DatabaseHelper {
   Future<void> _onCreate(Database db, int version) async {
     await db.execute('''
       CREATE TABLE $tableFlashcards (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id TEXT PRIMARY KEY,
         word TEXT NOT NULL,
         targetLanguageCode TEXT NOT NULL,
         translation TEXT NOT NULL,
@@ -47,7 +47,8 @@ class DatabaseHelper {
         srsInterval REAL NOT NULL,
         srsEaseFactor REAL NOT NULL,
         srsNextReviewDate INTEGER NOT NULL,
-        srsLastReviewDate INTEGER
+        srsLastReviewDate INTEGER,
+        synced INTEGER DEFAULT 0
       )
     ''');
   }
@@ -114,6 +115,26 @@ class DatabaseHelper {
   Future<void> deleteAllFlashcards() async {
     final db = await database;
     await db.delete(tableFlashcards);
+  }
+
+  Future<void> markAsSynced(String id) async {
+    final db = await database;
+    await db.update(
+      tableFlashcards,
+      {'synced': 1},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<List<Flashcard>> getUnsynced() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      tableFlashcards,
+      where: 'synced = ?',
+      whereArgs: [0],
+    );
+    return List.generate(maps.length, (i) => Flashcard.fromMap(maps[i]));
   }
 
   // Close the database

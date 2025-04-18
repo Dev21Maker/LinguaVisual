@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:lingua_visual/main.dart';
-import '../providers/flashcard_provider.dart';
 import '../widgets/flashcard_view.dart';
 
 class OfflineTrainingScreen extends HookConsumerWidget {
@@ -15,13 +14,13 @@ class OfflineTrainingScreen extends HookConsumerWidget {
     final currentIndexState = useState(0);
     final currentIndex = currentIndexState.value;
 
-    if (flashcards.isEmpty) {
+    if (flashcards.value?.isEmpty ?? true) {
       return const Scaffold(
         body: Center(child: Text('No flashcards available')),
       );
     }
 
-    final currentCard = flashcards[currentIndex];
+    final currentCard = flashcards.value![currentIndex];
 
     Future<void> onRatingSelected(String rating) async {
       // Update SRS data based on rating
@@ -38,7 +37,7 @@ class OfflineTrainingScreen extends HookConsumerWidget {
           .updateCard(updatedCard);
 
       // Move to next card or finish
-      if (currentIndex < flashcards.length - 1) {
+      if (currentIndex < flashcards.value!.length - 1) {
         currentIndexState.value = currentIndex + 1;
       } else {
         if (context.mounted) {
@@ -48,7 +47,7 @@ class OfflineTrainingScreen extends HookConsumerWidget {
             builder:
                 (context) => AlertDialog(
                   title: const Text('Training Complete!'),
-                  content: Text('You reviewed ${flashcards.length} cards'),
+                  content: Text('You reviewed ${flashcards.value!.length} cards'),
                   actions: [
                     TextButton(
                       onPressed: () {
@@ -68,7 +67,7 @@ class OfflineTrainingScreen extends HookConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Card ${currentIndex + 1}/${flashcards.length}'),
+        title: Text('Card ${currentIndex + 1}/${flashcards.value!.length}'),
         actions: [
           TextButton.icon(
             onPressed: () {

@@ -1,12 +1,12 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'supabase_service.dart';
+import 'firebase_service.dart';
 
 class AuthService {
-  final SupabaseService _supabase;
+  final FirebaseService _firebase;
   static const String _keepLoggedInKey = 'keepLoggedIn';
 
-  AuthService(this._supabase);
+  AuthService(this._firebase);
 
   Future<void> setKeepLoggedIn(bool value) async {
     final prefs = await SharedPreferences.getInstance();
@@ -19,27 +19,26 @@ class AuthService {
   }
 
   // Sign up
-  Future<AuthResponse> signUp({
+  Future<UserCredential> signUp({
     required String email,
     required String password,
   }) async {
-    return await _supabase.signUp(
+    return await _firebase.signUp(
       email: email,
       password: password,
     );
   }
 
   // Sign in with remember me option
-  Future<AuthResponse> signIn({
+  Future<UserCredential> signIn({
     required String email,
     required String password,
     required bool keepLoggedIn,
   }) async {
-    final response = await _supabase.signIn(
+    final response = await _firebase.signIn(
       email: email,
       password: password,
     );
-    
     await setKeepLoggedIn(keepLoggedIn);
     return response;
   }
@@ -48,36 +47,30 @@ class AuthService {
   Future<void> signOut({bool force = false}) async {
     if (force) {
       await setKeepLoggedIn(false);
-      await _supabase.signOut();
+      await _firebase.signOut();
     } else {
       final keepLoggedIn = await getKeepLoggedIn();
       if (!keepLoggedIn) {
-        await _supabase.signOut();
+        await _firebase.signOut();
       }
     }
   }
 
   // Get current user
-  User? get currentUser => _supabase.currentUser;
+  User? get currentUser => _firebase.currentUser;
 
   // Check if user is signed in
-  bool get isAuthenticated => _supabase.isAuthenticated;
-
-  // Get the current session
-  Session? get currentSession => _supabase.currentSession;
+  bool get isAuthenticated => _firebase.currentUser != null;
 
   // Stream of auth changes
-  Stream<AuthState> get authStateChanges => _supabase.authStateChanges;
+  Stream<User?> get authStateChanges => _firebase.authStateChanges;
 
   // Initialize auth state with keep logged in check
   Future<void> initializeAuthState() async {
     try {
       final keepLoggedIn = await getKeepLoggedIn();
-      final initialSession = _supabase.currentSession;
-
-      if (initialSession != null && keepLoggedIn) {
-        await _supabase.refreshSession();
-      } else if (initialSession != null && !keepLoggedIn) {
+      final user = _firebase.currentUser;
+      if (user != null && !keepLoggedIn) {
         await signOut(force: true);
       }
     } catch (e) {
@@ -85,11 +78,8 @@ class AuthService {
     }
   }
 
-  // Get user metadata
-  Map<String, dynamic>? get userMetadata => currentUser?.userMetadata;
-
   // Update user metadata
-  Future<UserResponse> updateUserMetadata(Map<String, dynamic> metadata) async {
-    return await _supabase.updateUserMetadata(metadata);
+  Future<void> updateUserMetadata(Map<String, dynamic> metadata) async {
+    await _firebase.updateUserMetadata(metadata);
   }
 }

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../providers/supabase_provider.dart'; 
+import '../../services/auth_service.dart';
+
+final authServiceProvider = Provider((ref) => AuthService(ref.watch(firebaseServiceProvider)));
 
 class SignUpScreen extends ConsumerStatefulWidget {
   const SignUpScreen({super.key});
@@ -30,33 +33,24 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await Supabase.instance.client.auth.signUp(
+      final authService = ref.read(authServiceProvider);
+      await authService.signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
-      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Please check your email to confirm your account'),
+            content: Text('Account created! Please check your email to verify.'),
           ),
         );
         Navigator.of(context).pop(); // Return to login screen
       }
-    } on AuthException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.message),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('An unexpected error occurred'),
+          SnackBar(
+            content: Text(e.toString()),
             backgroundColor: Colors.red,
           ),
         );

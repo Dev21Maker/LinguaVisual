@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "325036769782",
+    "project_id": "ll-flashcards-fed5b",
+    "storage_bucket": "ll-flashcards-fed5b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:325036769782:android:5fc58f1fb87164d74187d7",
+        "android_client_info": {
+          "package_name": "com.example.lingua_visual"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD0UjOX5z6GCa3dg9sA7yePej6O0Ai__UQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

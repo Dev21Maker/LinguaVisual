@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:lingua_visual/services/supabase_service.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/auth_service.dart';
 import 'signup_screen.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/keep_signed_in_service.dart';
+import '../../providers/supabase_provider.dart'; // Exports firebaseServiceProvider
 
-final authServiceProvider = Provider((ref) => AuthService(SupabaseService()));
+final authServiceProvider = Provider((ref) => AuthService(ref.watch(firebaseServiceProvider)));
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -47,11 +46,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       // No need to navigate here as the StreamBuilder in MyApp 
       // will automatically handle navigation when auth state changes
       
-    } on AuthException catch (e) {
+    } on FirebaseAuthException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.message),
+            content: Text(e.message ?? 'Authentication error'),
             backgroundColor: Colors.red,
           ),
         );

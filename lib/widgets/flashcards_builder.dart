@@ -5,11 +5,13 @@ import 'package:lingua_visual/main.dart';
 import 'package:lingua_visual/models/flashcard.dart';
 import 'package:lingua_visual/models/language.dart';
 import 'package:lingua_visual/providers/settings_provider.dart';
+import 'package:lingua_visual/providers/flashcard_provider.dart';
+import 'package:uuid/uuid.dart';
 
 class FlashCardBuilder extends StatelessWidget {
   const FlashCardBuilder({
     required this.ref,
-    super.key,
+    super.key, String? stackId,
   });
 
   final WidgetRef ref;
@@ -37,7 +39,7 @@ class FlashCardBuilder extends StatelessWidget {
             
             if (word.isNotEmpty && translation.isNotEmpty) {
               final newFlashcard = Flashcard(
-                id: DateTime.now().millisecondsSinceEpoch.toString(),
+                id: const Uuid().v4(), // Use UUID instead of timestamp
                 word: word,
                 translation: translation,
                 targetLanguageCode: targetLanguageState.value.code,
@@ -46,9 +48,12 @@ class FlashCardBuilder extends StatelessWidget {
                 srsInterval: 1.0,
                 srsEaseFactor: 2.5,
               );
-    
-              await ref.read(offlineFlashcardsProvider.notifier)
-                  .addFlashcard(newFlashcard);
+
+              if (ref.read(isOnlineProvider)) {
+                await ref.read(flashcardStateProvider.notifier).addFlashcard(newFlashcard);
+              } else {
+                await ref.read(offlineFlashcardsProvider.notifier).addFlashcard(newFlashcard);
+              }
             }
           }
         }
@@ -230,7 +235,7 @@ class FlashCardBuilder extends StatelessWidget {
                   await _addBulkFlashcards();
                 } else {
                   final newFlashcard = Flashcard(
-                    id: DateTime.now().millisecondsSinceEpoch.toString(),
+                    id: const Uuid().v4(), // Use UUID instead of timestamp
                     word: wordController.text,
                     translation: translationController.text,
                     targetLanguageCode: targetLanguageState.value.code,
@@ -239,11 +244,13 @@ class FlashCardBuilder extends StatelessWidget {
                     srsInterval: 1.0,
                     srsEaseFactor: 2.5,
                   );
-    
-                  await ref.read(offlineFlashcardsProvider.notifier)
-                      .addFlashcard(newFlashcard);
+
+                  if (ref.read(isOnlineProvider)) {
+                    await ref.read(flashcardStateProvider.notifier).addFlashcard(newFlashcard);
+                  } else {
+                    await ref.read(offlineFlashcardsProvider.notifier).addFlashcard(newFlashcard);
+                  }
                 }
-    
                 if (context.mounted) {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(

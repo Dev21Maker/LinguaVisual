@@ -1,11 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lingua_visual/providers/settings_provider.dart';
 import 'package:lingua_visual/providers/supabase_provider.dart';
-import 'package:uuid/uuid.dart';
+// import 'package:uuid/uuid.dart';
 import '../models/flashcard.dart';
 import 'database_provider.dart';
-import 'api_provider.dart';
-import 'srs_provider.dart';
+// import 'api_provider.dart';
+// import 'srs_provider.dart';
 import '../services/recraft_api_service.dart';
 
 // Existing providers
@@ -59,12 +59,12 @@ class ActiveLearningNotifier extends StateNotifier<ActiveLearningState> {
     try {
       state = state.copyWith(isLoading: true, error: null);
       
-      final supabaseService = ref.read(supabaseServiceProvider);
-      final cards = await supabaseService.fetchDueCards();
+      final firebaseService = ref.read(firebaseServiceProvider);
+      final cards = await firebaseService.fetchDueCards();
       
       if (cards.isEmpty) {
         await _fetchAndInsertNewWord();
-        final updatedCards = await supabaseService.fetchDueCards();
+        final updatedCards = await firebaseService.fetchDueCards();
         state = state.copyWith(
           dueCards: updatedCards,
           currentCard: updatedCards.isNotEmpty ? updatedCards.first : null,
@@ -87,36 +87,39 @@ class ActiveLearningNotifier extends StateNotifier<ActiveLearningState> {
 
   Future<void> _fetchAndInsertNewWord() async {
     try {
-      final supabaseService = ref.read(supabaseServiceProvider);
-      final settings = ref.read(settingsProvider);
+      // final firebaseService = ref.read(firebaseServiceProvider);
+      // final settings = ref.read(settingsProvider);
       
-      final wordData = await supabaseService.fetchNewWordViaFunction(
-        targetLanguageCode: settings.targetLanguage.code,
-        nativeLanguageCode: settings.nativeLanguage.code,
-      );
+      // TODO: Implement fetchNewWordViaFunction for Firebase or handle this feature.
+      // final wordData = await firebaseService.fetchNewWordViaFunction(
+      //   targetLanguageCode: settings.targetLanguage.code,
+      //   nativeLanguageCode: settings.nativeLanguage.code,
+      // );
+      // For now, throw UnimplementedError or handle as needed.
+      throw UnimplementedError('fetchNewWordViaFunction is not implemented for Firebase');
       
-      String? imageUrl;
-      try {
-        final recraftApi = ref.read(recraftApiProvider);
-        imageUrl = await recraftApi.getImageUrl(wordData['word']!);
-      } catch (e) {
-        // Log error but continue without image
-        print('Failed to generate image: $e');
-      }
+      // String? imageUrl;
+      // try {
+      //   final recraftApi = ref.read(recraftApiProvider);
+      //   imageUrl = await recraftApi.getImageUrl(wordData['word']!);
+      // } catch (e) {
+      //   // Log error but continue without image
+      //   print('Failed to generate image: $e');
+      // }
 
-      final flashcard = Flashcard(
-        id: wordData['id'],
-        word: wordData['word'],
-        targetLanguageCode: settings.targetLanguage.code,
-        translation: wordData['translation'],
-        nativeLanguageCode: settings.nativeLanguage.code,
-        imageUrl: imageUrl,
-        srsNextReviewDate: DateTime.now().millisecondsSinceEpoch,
-        srsInterval: 1.0,
-        srsEaseFactor: 2.5,
-      );
+      // final flashcard = Flashcard(
+      //   id: wordData['id'],
+      //   word: wordData['word'],
+      //   targetLanguageCode: settings.targetLanguage.code,
+      //   translation: wordData['translation'],
+      //   nativeLanguageCode: settings.nativeLanguage.code,
+      //   imageUrl: imageUrl,
+      //   srsNextReviewDate: DateTime.now().millisecondsSinceEpoch,
+      //   srsInterval: 1.0,
+      //   srsEaseFactor: 2.5,
+      // );
       
-      await supabaseService.insertCard(flashcard);
+      // await firebaseService.insertCard(flashcard);
     } catch (e) {
       state = state.copyWith(error: 'Failed to fetch new word: ${e.toString()}');
       rethrow;
@@ -202,8 +205,8 @@ class FlashcardStateNotifier extends StateNotifier<AsyncValue<List<Flashcard>>> 
 
   Future<void> _loadFlashcards() async {
     try {
-      final supabaseService = ref.read(supabaseServiceProvider);
-      final flashcardsData = await supabaseService.getFlashcards();
+      final firebaseService = ref.read(firebaseServiceProvider);
+      final flashcardsData = await firebaseService.getFlashcards();
       final flashcards = flashcardsData
           .map((data) => Flashcard.fromMap(data))
           .toList();
@@ -215,8 +218,8 @@ class FlashcardStateNotifier extends StateNotifier<AsyncValue<List<Flashcard>>> 
 
   Future<void> addFlashcard(Flashcard flashcard) async {
     try {
-      final supabaseService = ref.read(supabaseServiceProvider);
-      await supabaseService.insertCard(flashcard);
+      final firebaseService = ref.read(firebaseServiceProvider);
+      await firebaseService.insertCard(flashcard);
       await _loadFlashcards(); // Reload the flashcards after adding
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -225,8 +228,8 @@ class FlashcardStateNotifier extends StateNotifier<AsyncValue<List<Flashcard>>> 
 
   Future<void> removeFlashcard(String id) async {
     try {
-      final supabaseService = ref.read(supabaseServiceProvider);
-      await supabaseService.deleteFlashcard(id);
+      final firebaseService = ref.read(firebaseServiceProvider);
+      await firebaseService.deleteFlashcard(id);
       await _loadFlashcards();
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -235,8 +238,8 @@ class FlashcardStateNotifier extends StateNotifier<AsyncValue<List<Flashcard>>> 
 
   Future<void> updateFlashcard(Flashcard flashcard) async {
     try {
-      final supabaseService = ref.read(supabaseServiceProvider);
-      await supabaseService.updateFlashcard(flashcard.id, flashcard.toMap());
+      final firebaseService = ref.read(firebaseServiceProvider);
+      await firebaseService.updateFlashcard(flashcard.id, flashcard.toMap());
       await _loadFlashcards();
     } catch (e, st) {
       state = AsyncValue.error(e, st);

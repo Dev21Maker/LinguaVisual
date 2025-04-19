@@ -1,4 +1,4 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'keep_signed_in_service.dart';
 
 class SessionCleanupService {
@@ -7,7 +7,7 @@ class SessionCleanupService {
   Future<void> cleanupSessionIfNeeded() async {
     final keepSignedIn = await _keepSignedInService.getKeepSignedIn();
     if (!keepSignedIn) {
-      await Supabase.instance.client.auth.signOut();
+      await FirebaseAuth.instance.signOut();
     }
   }
 }

@@ -1,23 +1,23 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:lingua_visual/screens/games/srs/learn_screen.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:lingua_visual/screens/games/games_view.dart';
 import 'package:lingua_visual/screens/progress/progress_screen.dart';
 import 'package:lingua_visual/screens/settings/settings_screen.dart';
 import 'package:lingua_visual/widgets/flashcards_builder.dart';
 import 'screens/flashcards/flashcard_screen.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:lingua_visual/screens/offline_training_screen.dart';
+import 'screens/offline_training_screen.dart';
 import 'package:lingua_visual/services/sync_service.dart';
-import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:lingua_visual/models/flashcard.dart';
 import 'package:lingua_visual/screens/auth/login_screen.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:lingua_visual/models/language.dart';
 import 'package:lingua_visual/providers/settings_provider.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'services/session_cleanup_service.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 // Add this provider to track connectivity state
 final isOnlineProvider = StateProvider<bool>((ref) => false);
@@ -29,23 +29,21 @@ void main() async {
   try {
     await dotenv.load(fileName: ".env");
   } catch (e) {
-    print('Warning: Failed to load .env file: $e');
+    debugPrint('Warning: Failed to load .env file: $e');
   }
   
-  // Initialize Supabase with fallback values if env vars are missing
+  // Initialize Firebase
   bool isOnline = false;
   try {
-    await Supabase.initialize(
-      url: dotenv.env['SUPABASE_URL']!,
-      anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
-    );
+    await Firebase.initializeApp();
     isOnline = true;
   } catch (e) {
-    print('Warning: Running in offline mode: $e');
+    debugPrint('Warning: Running in offline mode: $e');
   }
   
   // Initialize settings provider
-  final settingsProviderInstance = await initializeSettingsProvider();
+  final prefs = await SharedPreferences.getInstance();
+  final settingsNotifier = SettingsNotifier(prefs);
 
   // Clean up session if needed (for keep signed in)
   final sessionCleanupService = SessionCleanupService();
@@ -54,7 +52,7 @@ void main() async {
   runApp(
     ProviderScope(
       overrides: [
-        settingsProvider.overrideWithProvider(settingsProviderInstance),
+        settingsProvider.overrideWith((ref) => settingsNotifier),
         isOnlineProvider.overrideWith((ref) => isOnline),
       ],
       child: const MyApp(),
@@ -122,8 +120,8 @@ class MyApp extends ConsumerWidget {
           final isOnline = ref.watch(isOnlineProvider);
           if (!isOnline) return const OfflineHomeScreen();
           
-          return StreamBuilder<AuthState>(
-            stream: Supabase.instance.client.auth.onAuthStateChange,
+          return StreamBuilder<User?>(
+            stream: FirebaseAuth.instance.authStateChanges(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Scaffold(
@@ -131,7 +129,7 @@ class MyApp extends ConsumerWidget {
                 );
               }
 
-              if (snapshot.hasData && snapshot.data?.session != null) {
+              if (snapshot.hasData) {
                 return const HomeScreen();
               }
 
@@ -302,11 +300,8 @@ class OfflineHomeScreen extends ConsumerWidget {
                             : () async {
                                 isReconnecting.value = true;
                                 try {
-                                  // Try to initialize Supabase
-                                  await Supabase.initialize(
-                                    url: dotenv.env['SUPABASE_URL']!,
-                                    anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
-                                  );
+                                  // Try to initialize Firebase
+                                  await Firebase.initializeApp();
                                   
                                   // If successful, update online status
                                   ref.read(isOnlineProvider.notifier).state = true;
@@ -412,7 +407,7 @@ class HomeScreen extends StatelessWidget {
           ),
           body: TabBarView(
             children: [
-              LearnScreen(),
+              GamesView(),
               FlashcardScreen(),
               ProgressScreen(),
               SettingsScreen(), // Added SettingsScreen
@@ -457,7 +452,7 @@ class OfflineFlashcardsNotifier extends StateNotifier<AsyncValue<List<Flashcard>
     await prefs.setStringList('offline_flashcards', flashcardsJson);
   }
 
-  Future<void> removeFlashcard(int id) async {
+  Future<void> removeFlashcard(String id) async {
     final current = state.value ?? [];
     state = AsyncValue.data(current.where((flashcard) => flashcard.id != id).toList());
     await _saveFlashcards();
@@ -573,7 +568,7 @@ class OfflineFlashcardScreen extends HookConsumerWidget {
                 itemBuilder: (context, index) {
                   final flashcard = flashcards[index];
                   return Dismissible(
-                    key: Key(flashcard.id.toString()), // Convert id to String for Key
+                    key: Key(flashcard.id), // Convert id to String for Key
                     background: Container(
                       color: Colors.red,
                       alignment: Alignment.centerRight,
@@ -583,7 +578,7 @@ class OfflineFlashcardScreen extends HookConsumerWidget {
                     direction: DismissDirection.endToStart,
                     onDismissed: (direction) {
                       ref.read(offlineFlashcardsProvider.notifier)
-                          .removeFlashcard(int.parse(flashcard.id));
+                          .removeFlashcard(flashcard.id);
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('Flashcard deleted'),

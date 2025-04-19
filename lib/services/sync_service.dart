@@ -1,24 +1,26 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lingua_visual/services/database_helper.dart';
-import 'package:lingua_visual/services/supabase_service.dart';
+import 'package:lingua_visual/services/firebase_service.dart';
 import '../models/flashcard.dart';
-import '../providers/supabase_provider.dart';
 import '../providers/database_provider.dart';
+import '../providers/supabase_provider.dart'; // Add this import
+
+// No need to import firebase_provider.dart, use supabase_provider.dart which exports firebaseServiceProvider
 
 class SyncService {
-  final SupabaseService supabaseService;
+  final FirebaseService firebaseService;
   final DatabaseHelper databaseHelper;
 
-  SyncService(this.supabaseService, this.databaseHelper);
+  SyncService(this.firebaseService, this.databaseHelper);
 
   Future<void> syncOfflineData() async {
     // Get all offline flashcards
     final offlineCards = await databaseHelper.getAllFlashcards();
     
-    // For each offline card, try to sync with Supabase
+    // For each offline card, try to sync with Firebase
     for (final card in offlineCards) {
       try {
-        await supabaseService.insertCard(card);
+        await firebaseService.insertCard(card);
         // After successful sync, mark as synced in local DB
         await databaseHelper.markAsSynced(card.id);
       } catch (e) {
@@ -31,7 +33,7 @@ class SyncService {
 }
 
 final syncServiceProvider = Provider((ref) {
-  final supabaseService = ref.watch(supabaseServiceProvider);
+  final firebaseService = ref.watch(firebaseServiceProvider);
   final databaseHelper = ref.watch(databaseProvider);
-  return SyncService(supabaseService, databaseHelper);
+  return SyncService(firebaseService, databaseHelper);
 });

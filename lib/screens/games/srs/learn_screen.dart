@@ -5,7 +5,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:lingua_visual/main.dart';
 import 'package:lingua_visual/models/flashcard.dart';
 import 'package:lingua_visual/providers/flashcard_provider.dart';
-import 'package:lingua_visual/providers/supabase_provider.dart';
+import 'package:lingua_visual/providers/supabase_provider.dart'; // This now exports firebaseServiceProvider
 import 'package:lingua_visual/widgets/flashcard_view.dart';
 // import 'screens/progress_screen.dart';
 // import 'screens/settings_screen.dart';
@@ -66,12 +66,12 @@ class LearnScreen extends HookConsumerWidget {
       });
 
       try {
-        final supabaseService = ref.read(supabaseServiceProvider);
-        final cards = await supabaseService.fetchDueCards();
+        final firebaseService = ref.read(firebaseServiceProvider);
+        final cards = await firebaseService.fetchDueCards();
         
         if (cards.isEmpty) {
           await ref.read(activeLearningProvider.notifier).loadDueCards();
-          final updatedCards = await supabaseService.fetchDueCards();
+          final updatedCards = await firebaseService.fetchDueCards();
           dueCardsState.value = updatedCards;
         } else {
           dueCardsState.value = cards;
@@ -211,31 +211,45 @@ class LearnScreen extends HookConsumerWidget {
       return Scaffold(
         appBar: AppBar(title: const Text('Session Complete')),
         body: Center(
-          child: Card(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? const Color(0xFF23272F)
-                : Colors.white,
-            elevation: 12,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(32),
-              side: BorderSide(
-                color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
-                width: 2,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Card(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? const Color(0xFF23272F)
+                    : Colors.white,
+                elevation: 12,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(32),
+                  side: BorderSide(
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                    width: 2,
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(32.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.celebration, size: 64, color: Theme.of(context).colorScheme.primary),
+                      const SizedBox(height: 24),
+                      Text('You have finished all due flashcards!',
+                          style: Theme.of(context).textTheme.headlineMedium,
+                          textAlign: TextAlign.center),
+                    ],
+                  ),
+                ),
               ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(32.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.celebration, size: 64, color: Theme.of(context).colorScheme.primary),
-                  const SizedBox(height: 24),
-                  Text('You have finished all due flashcards!',
-                      style: Theme.of(context).textTheme.headlineMedium,
-                      textAlign: TextAlign.center),
-                ],
+              const SizedBox(height: 24),
+              TextButton.icon(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.home_outlined, size: 20),
+                label: const Text('Go Home'),
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.primary,
+                ),
               ),
-            ),
+            ],
           ),
         ),
       );
@@ -273,49 +287,41 @@ class LearnScreen extends HookConsumerWidget {
             ),
             const SizedBox(height: 32),
             // Flashcard
-            Card(
-              color: cardBg,
-              elevation: 12,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(32),
-                side: BorderSide(color: borderColor, width: 2),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 48),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      flashcard.word,
-                      style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                            fontWeight: FontWeight.bold, color: textColor),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 32),
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.arrow_forward),
-                      onPressed: () {
-                        nextCard();
-                        startCardTimer();
-                      },
-                      label: const Text('Next'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: borderColor,
-                        foregroundColor: isDark ? Colors.black : Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(18),
+            Expanded(
+              child: FlashcardView(
+                flashcards: [flashcard],
+                onRatingSelected: (rating, flashcard) async {
+                  // Cancel the auto-advance timer when user rates
+                  cardTimer.value?.cancel();
+                  
+                  try {
+                    // Update the card's SRS data in Supabase
+                    await ref.read(activeLearningProvider.notifier).processCardRating(rating);
+                    
+                    // Move to next card
+                    nextCard();
+                    
+                    // Start the timer for the next card
+                    if (!isSessionComplete.value) {
+                      startCardTimer();
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Error updating card: ${e.toString()}'),
+                          backgroundColor: Theme.of(context).colorScheme.error,
                         ),
-                        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 18),
-                        elevation: 0,
-                      ),
-                    ),
-                  ],
-                ),
+                      );
+                    }
+                  }
+                },
               ),
             ),
             const SizedBox(height: 24),
             Text('Card ${currentIndex.value + 1} of ${dueCardsState.value.length}',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: borderColor)),
+            const SizedBox(height: 24),
           ],
         ),
       ),

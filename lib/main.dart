@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -33,10 +34,10 @@ void main() async {
   }
   
   // Initialize Firebase
-  bool isOnline = false;
   try {
     await Firebase.initializeApp();
-    isOnline = true;
+    final container = ProviderContainer();
+    container.read(isOnlineProvider.notifier).state = true;
   } catch (e) {
     debugPrint('Warning: Running in offline mode: $e');
   }
@@ -53,7 +54,6 @@ void main() async {
     ProviderScope(
       overrides: [
         settingsProvider.overrideWith((ref) => settingsNotifier),
-        isOnlineProvider.overrideWith((ref) => isOnline),
       ],
       child: const MyApp(),
     ),
@@ -102,13 +102,46 @@ class AppTheme {
   Color get onError => Colors.white;
 }
 
-class MyApp extends ConsumerWidget {
+class MyApp extends HookConsumerWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
     final themeMode = settings.isDarkMode ? ThemeMode.dark : ThemeMode.light;
+
+    useEffect(() {
+      final connectivity = Connectivity();
+      // Initial connectivity check
+      connectivity.checkConnectivity().then((result) async {
+        final hasConnection = result != ConnectivityResult.none;
+        ref.read(isOnlineProvider.notifier).state = hasConnection;
+        if (hasConnection) {
+          try {
+            await Firebase.initializeApp();
+          } catch (e) {
+            debugPrint('Error init Firebase: $e');
+          }
+        }
+      });
+      // Listen for connectivity changes
+      final subscription = connectivity.onConnectivityChanged.listen((result) async {
+        final hasConnection = result != ConnectivityResult.none;
+        ref.read(isOnlineProvider.notifier).state = hasConnection;
+        if (hasConnection) {
+          try {
+            await Firebase.initializeApp();
+            final syncService = ref.read(syncServiceProvider);
+            await syncService.syncOfflineData();
+          } catch (e) {
+            debugPrint('Failed to reconnect: $e');
+          }
+        }
+      });
+      return () {
+        subscription.cancel();
+      };
+    }, const []);
 
     return MaterialApp(
       title: 'LinguaVisual',

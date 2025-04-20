@@ -1,9 +1,11 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class FlashcardStack {
   final String id;
   final String name;
   final String description;
   final DateTime createdAt;
-  final List<String> flashcardIds; // References to flashcards in this stack
+  final List<String> flashcardIds;
   final String? imageUrl;
 
   FlashcardStack({
@@ -14,6 +16,30 @@ class FlashcardStack {
     required this.flashcardIds,
     this.imageUrl,
   });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'description': description,
+      'created_at': createdAt.toUtc().toIso8601String(),
+      'flashcard_ids': flashcardIds,
+      'image_url': imageUrl,
+    };
+  }
+
+  factory FlashcardStack.fromMap(Map<String, dynamic> map) {
+    return FlashcardStack(
+      id: map['id'] as String,
+      name: map['name'] as String,
+      description: map['description'] as String,
+      createdAt: (map['created_at'] is Timestamp)
+          ? (map['created_at'] as Timestamp).toDate()
+          : DateTime.parse(map['created_at'] as String),
+      flashcardIds: List<String>.from(map['flashcard_ids'] ?? []),
+      imageUrl: map['image_url'] as String?,
+    );
+  }
 
   FlashcardStack copyWith({
     String? name,
@@ -30,22 +56,4 @@ class FlashcardStack {
       imageUrl: imageUrl ?? this.imageUrl,
     );
   }
-
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'description': description,
-    'createdAt': createdAt.toIso8601String(),
-    'flashcardIds': flashcardIds,
-    'imageUrl': imageUrl,
-  };
-
-  factory FlashcardStack.fromJson(Map<String, dynamic> json) => FlashcardStack(
-    id: json['id'],
-    name: json['name'],
-    description: json['description'],
-    createdAt: DateTime.parse(json['createdAt']),
-    flashcardIds: List<String>.from(json['flashcardIds']),
-    imageUrl: json['imageUrl'],
-  );
 }

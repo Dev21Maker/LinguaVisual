@@ -3,20 +3,20 @@ import 'package:lingua_visual/providers/settings_provider.dart';
 import 'package:lingua_visual/providers/supabase_provider.dart';
 // import 'package:uuid/uuid.dart';
 import '../models/flashcard.dart';
-import 'database_provider.dart';
+// import 'database_provider.dart'; // now using Firestore
 // import 'api_provider.dart';
 // import 'srs_provider.dart';
 import '../services/recraft_api_service.dart';
 
 // Existing providers
 final flashcardsProvider = FutureProvider<List<Flashcard>>((ref) async {
-  final dbHelper = ref.watch(databaseProvider);
-  return await dbHelper.getAllFlashcards();
+  final firebaseService = ref.watch(firebaseServiceProvider);
+  return await firebaseService.getFlashcards();
 });
 
 final dueFlashcardsProvider = FutureProvider<List<Flashcard>>((ref) async {
-  final dbHelper = ref.watch(databaseProvider);
-  return await dbHelper.getDueFlashcards();
+  final firebaseService = ref.watch(firebaseServiceProvider);
+  return await firebaseService.fetchDueCards();
 });
 
 final recraftApiProvider = Provider((ref) => RecraftApiService());
@@ -206,10 +206,7 @@ class FlashcardStateNotifier extends StateNotifier<AsyncValue<List<Flashcard>>> 
   Future<void> _loadFlashcards() async {
     try {
       final firebaseService = ref.read(firebaseServiceProvider);
-      final flashcardsData = await firebaseService.getFlashcards();
-      final flashcards = flashcardsData
-          .map((data) => Flashcard.fromMap(data))
-          .toList();
+      final List<Flashcard> flashcards = await firebaseService.getFlashcards();
       state = AsyncValue.data(flashcards);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -229,7 +226,7 @@ class FlashcardStateNotifier extends StateNotifier<AsyncValue<List<Flashcard>>> 
   Future<void> removeFlashcard(String id) async {
     try {
       final firebaseService = ref.read(firebaseServiceProvider);
-      await firebaseService.deleteFlashcard(id);
+      await firebaseService.deleteCard(id);
       await _loadFlashcards();
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -239,7 +236,7 @@ class FlashcardStateNotifier extends StateNotifier<AsyncValue<List<Flashcard>>> 
   Future<void> updateFlashcard(Flashcard flashcard) async {
     try {
       final firebaseService = ref.read(firebaseServiceProvider);
-      await firebaseService.updateFlashcard(flashcard.id, flashcard.toMap());
+      await firebaseService.updateCard(flashcard);
       await _loadFlashcards();
     } catch (e, st) {
       state = AsyncValue.error(e, st);

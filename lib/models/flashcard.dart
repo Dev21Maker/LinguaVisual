@@ -1,9 +1,11 @@
+import 'language.dart';
+
 class Flashcard {
   final String id;
   final String word;
-  final String targetLanguageCode;
+  final Language targetLanguage;
   final String translation;
-  final String nativeLanguageCode;
+  final Language nativeLanguage;
   final String? imageUrl;
   final String? cachedImagePath;
   final double srsInterval;
@@ -12,13 +14,14 @@ class Flashcard {
   final int? srsLastReviewDate;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final List<String> stackIds; // New property
 
   const Flashcard({
     required this.id,
     required this.word,
-    required this.targetLanguageCode,
+    required this.targetLanguage,
     required this.translation,
-    required this.nativeLanguageCode,
+    required this.nativeLanguage,
     this.imageUrl,
     this.cachedImagePath,
     this.srsInterval = 1.0,
@@ -27,14 +30,15 @@ class Flashcard {
     this.srsLastReviewDate,
     this.createdAt,
     this.updatedAt,
+    this.stackIds = const [], // Default to empty list
   });
 
   Flashcard copyWith({
     String? id,
     String? word,
-    String? targetLanguageCode,
+    Language? targetLanguage,
     String? translation,
-    String? nativeLanguageCode,
+    Language? nativeLanguage,
     String? imageUrl,
     String? cachedImagePath,
     double? srsInterval,
@@ -43,13 +47,14 @@ class Flashcard {
     int? srsLastReviewDate,
     DateTime? createdAt,
     DateTime? updatedAt,
+    List<String>? stackIds,
   }) {
     return Flashcard(
       id: id ?? this.id,
       word: word ?? this.word,
-      targetLanguageCode: targetLanguageCode ?? this.targetLanguageCode,
+      targetLanguage: targetLanguage ?? this.targetLanguage,
       translation: translation ?? this.translation,
-      nativeLanguageCode: nativeLanguageCode ?? this.nativeLanguageCode,
+      nativeLanguage: nativeLanguage ?? this.nativeLanguage,
       imageUrl: imageUrl ?? this.imageUrl,
       cachedImagePath: cachedImagePath ?? this.cachedImagePath,
       srsInterval: srsInterval ?? this.srsInterval,
@@ -58,6 +63,7 @@ class Flashcard {
       srsLastReviewDate: srsLastReviewDate ?? this.srsLastReviewDate,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      stackIds: stackIds ?? this.stackIds,
     );
   }
 
@@ -66,9 +72,9 @@ class Flashcard {
     return {
       'id': id,
       'word': word,
-      'target_language_code': targetLanguageCode,
+      'target_language': targetLanguage.toMap(),
       'translation': translation,
-      'native_language_code': nativeLanguageCode,
+      'native_language': nativeLanguage.toMap(),
       'image_url': imageUrl,
       'cached_image_path': cachedImagePath,
       'srs_interval': srsInterval,
@@ -77,6 +83,7 @@ class Flashcard {
       'srs_last_review_date': srsLastReviewDate,
       'created_at': createdAt?.toIso8601String() ?? now.toIso8601String(),
       'updated_at': now.toIso8601String(),
+      'stack_ids': stackIds,
     };
   }
 
@@ -117,12 +124,22 @@ class Flashcard {
       return 0.0;
     }
 
+    // Parse nested Language objects or fallback to codes
+    final targetLangMap = map['target_language'] as Map<String, dynamic>?;
+    final nativeLangMap = map['native_language'] as Map<String, dynamic>?;
+    final targetLang = targetLangMap != null
+        ? Language.fromMap(targetLangMap)
+        : Language.fromCode(map['target_language_code'] as String? ?? '');
+    final nativeLang = nativeLangMap != null
+        ? Language.fromMap(nativeLangMap)
+        : Language.fromCode(map['native_language_code'] as String? ?? '');
+
     return Flashcard(
       id: (map['id'] ?? '').toString(),
       word: map['word'] as String? ?? '',
-      targetLanguageCode: map['target_language_code'] as String? ?? '',
+      targetLanguage: targetLang,
       translation: map['translation'] as String? ?? '',
-      nativeLanguageCode: map['native_language_code'] as String? ?? '',
+      nativeLanguage: nativeLang,
       imageUrl: map['image_url'] as String?,
       cachedImagePath: map['cached_image_path'] as String?,
       srsInterval: parseDouble(map['srs_interval']),
@@ -131,13 +148,14 @@ class Flashcard {
       srsLastReviewDate: parseTimestamp(map['srs_last_review_date']),
       createdAt: parseDateTime(map['created_at']),
       updatedAt: parseDateTime(map['updated_at']),
+      stackIds: List<String>.from(map['stack_ids'] ?? []),
     );
   }
 
   @override
   String toString() {
-    return 'Flashcard(id: $id, word: $word, targetLanguageCode: $targetLanguageCode, '
-        'translation: $translation, nativeLanguageCode: $nativeLanguageCode, '
+    return 'Flashcard(id: $id, word: $word, targetLanguage: ${targetLanguage.code}, '
+        'translation: $translation, nativeLanguage: ${nativeLanguage.code}, '
         'imageUrl: $imageUrl, cachedImagePath: $cachedImagePath, '
         'srsInterval: $srsInterval, srsEaseFactor: $srsEaseFactor, '
         'srsNextReviewDate: $srsNextReviewDate, srsLastReviewDate: $srsLastReviewDate)';

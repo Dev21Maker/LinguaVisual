@@ -43,7 +43,7 @@ class _FlashcardWidgetState extends State<FlashcardWidget> {
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 Text(
-                  flashcard.targetLanguageCode.toUpperCase(),
+                  flashcard.targetLanguage.code.toUpperCase(),
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Colors.grey,
                   ),
@@ -59,7 +59,7 @@ class _FlashcardWidgetState extends State<FlashcardWidget> {
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 Text(
-                  flashcard.nativeLanguageCode.toUpperCase(),
+                  flashcard.nativeLanguage.code.toUpperCase(),
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Colors.grey,
                   ),

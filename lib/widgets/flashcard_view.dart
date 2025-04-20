@@ -175,7 +175,7 @@ class _FlashcardViewState extends State<FlashcardView> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  flashcard.targetLanguageCode.toUpperCase(),
+                  flashcard.targetLanguage.code.toUpperCase(),
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.7),
                     fontSize: 16,
@@ -218,7 +218,7 @@ class _FlashcardViewState extends State<FlashcardView> {
           ),
           const SizedBox(height: 8),
           Text(
-            flashcard.nativeLanguageCode.toUpperCase(),
+            flashcard.nativeLanguage.code.toUpperCase(),
             style: TextStyle(
               color: Colors.white.withOpacity(0.7),
               fontSize: 16,

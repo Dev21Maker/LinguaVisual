@@ -41,9 +41,9 @@ class FlashCardBuilder extends StatelessWidget {
               final newFlashcard = Flashcard(
                 id: const Uuid().v4(), // Use UUID instead of timestamp
                 word: word,
+                targetLanguage: targetLanguageState.value,
                 translation: translation,
-                targetLanguageCode: targetLanguageState.value.code,
-                nativeLanguageCode: nativeLanguageState.value.code,
+                nativeLanguage: nativeLanguageState.value,
                 srsNextReviewDate: DateTime.now().millisecondsSinceEpoch,
                 srsInterval: 1.0,
                 srsEaseFactor: 2.5,
@@ -237,9 +237,9 @@ class FlashCardBuilder extends StatelessWidget {
                   final newFlashcard = Flashcard(
                     id: const Uuid().v4(), // Use UUID instead of timestamp
                     word: wordController.text,
+                    targetLanguage: targetLanguageState.value,
                     translation: translationController.text,
-                    targetLanguageCode: targetLanguageState.value.code,
-                    nativeLanguageCode: nativeLanguageState.value.code,
+                    nativeLanguage: nativeLanguageState.value,
                     srsNextReviewDate: DateTime.now().millisecondsSinceEpoch,
                     srsInterval: 1.0,
                     srsEaseFactor: 2.5,

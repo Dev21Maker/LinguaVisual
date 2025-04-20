@@ -5,12 +5,11 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:lingua_visual/main.dart';
 import 'package:lingua_visual/models/flashcard.dart';
 import 'package:lingua_visual/providers/flashcard_provider.dart';
-import 'package:lingua_visual/providers/supabase_provider.dart'; // This now exports firebaseServiceProvider
-import 'package:lingua_visual/widgets/flashcard_view.dart';
-// import 'screens/progress_screen.dart';
-// import 'screens/settings_screen.dart';
+import 'package:lingua_visual/providers/settings_provider.dart';
 import 'package:lingua_visual/providers/auth_provider.dart' as auth_prov;
 import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:multi_language_srs/multi_language_srs.dart';
+import 'package:lingua_visual/widgets/flashcard_view.dart';
 
 class LearnScreen extends HookConsumerWidget {
   const LearnScreen({super.key});
@@ -21,6 +20,8 @@ class LearnScreen extends HookConsumerWidget {
     final isLoadingState = useState(true);
     final errorState = useState<String?>(null);
     final showEmptyState = useState(false);
+    final settings = ref.watch(settingsProvider);
+    final srsManager = useMemoized(() => SRSManager());
 
     // --- Flashcard login/session refresh logic ---
     final _loginTimer = useRef<Timer?>(null);
@@ -66,16 +67,22 @@ class LearnScreen extends HookConsumerWidget {
       });
 
       try {
-        final firebaseService = ref.read(firebaseServiceProvider);
-        final cards = await firebaseService.fetchDueCards();
-        
-        if (cards.isEmpty) {
-          await ref.read(activeLearningProvider.notifier).loadDueCards();
-          final updatedCards = await firebaseService.fetchDueCards();
-          dueCardsState.value = updatedCards;
-        } else {
-          dueCardsState.value = cards;
-        }
+        // Fetch due items from SRS package and sort by earliest nextReviewDate
+        final srsItems = srsManager.getDueItems(
+          DateTime.now(),
+          languageId: settings.targetLanguage.code,
+        );
+        srsItems.sort((a, b) => a.nextReviewDate.compareTo(b.nextReviewDate));
+        dueCardsState.value = srsItems.map((item) => Flashcard(
+          id: item.id,
+          word: item.question,
+          targetLanguage: settings.targetLanguage,
+          translation: item.answer,
+          nativeLanguage: settings.nativeLanguage,
+          srsInterval: item.interval.toDouble(),
+          srsEaseFactor: item.easeFactor,
+          srsNextReviewDate: item.nextReviewDate.millisecondsSinceEpoch,
+        )).toList();
       } catch (e) {
         errorState.value = e.toString();
       } finally {
@@ -268,22 +275,37 @@ class LearnScreen extends HookConsumerWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             // Progress indicator
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(
-                dueCardsState.value.length,
-                (idx) => Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 3),
-                  width: 10,
-                  height: 10,
-                  decoration: BoxDecoration(
-                    color: idx == currentIndex.value
-                        ? borderColor
-                        : borderColor.withOpacity(0.3),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
+            Builder(
+              builder: (context) {
+                final total = dueCardsState.value.length;
+                final groupSize = 10;
+                final group = currentIndex.value ~/ groupSize;
+                final start = group * groupSize;
+                final end = (start + groupSize > total) ? total : start + groupSize;
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (start > 0)
+                      const Text('... ', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ...List.generate(end - start, (i) {
+                      final idx = start + i;
+                      return Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 3),
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: idx == currentIndex.value
+                              ? borderColor
+                              : borderColor.withOpacity(0.3),
+                          shape: BoxShape.circle,
+                        ),
+                      );
+                    }),
+                    if (end < total)
+                      const Text(' ...', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 32),
             // Flashcard

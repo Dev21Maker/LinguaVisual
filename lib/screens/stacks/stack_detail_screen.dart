@@ -3,7 +3,6 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:lingua_visual/providers/stack_provider.dart';
 import '../../models/flashcard_stack.dart';
 import '../../providers/flashcard_provider.dart';
-import '../flashcards/flashcard_screen.dart';
 
 class StackDetailScreen extends ConsumerWidget {
   final FlashcardStack stack;

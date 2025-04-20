@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:lingua_visual/models/flashcard_stack.dart';
 import '../models/flashcard.dart';
 
 class FirebaseService {
@@ -41,76 +42,120 @@ class FirebaseService {
   }
 
   // Database operations (Firestore)
-  Future<List<Map<String, dynamic>>> getFlashcards() async {
+  Future<List<Flashcard>> getFlashcards() async {
     if (currentUser == null) return [];
     final snapshot = await _firestore
-        .collection('flashcards')
-        .where('user_id', isEqualTo: currentUser!.uid)
+        .collection('users')
+        .doc(currentUser!.uid)
+        .collection('cards')
         .orderBy('created_at')
         .get();
-    return snapshot.docs.map((doc) => doc.data()).toList();
+    return snapshot.docs.map((doc) {
+      final data = {...doc.data(), 'id': doc.id};
+      return Flashcard.fromMap(data);
+    }).toList();
   }
 
-  Future<void> insertFlashcard(Map<String, dynamic> flashcard) async {
-    await _firestore.collection('flashcards').add(flashcard);
+  Future<void> insertCard(Flashcard card) async {
+    if (currentUser == null) throw Exception('User not authenticated');
+    final cardData = card.toMap();
+    cardData['created_at'] = FieldValue.serverTimestamp();
+    cardData.remove('id');
+    await _firestore
+        .collection('users')
+        .doc(currentUser!.uid)
+        .collection('cards')
+        .add(cardData);
   }
 
-  Future<void> updateFlashcard(String id, Map<String, dynamic> updates) async {
-    await _firestore.collection('flashcards').doc(id).update(updates);
+  Future<void> updateCard(Flashcard card) async {
+    if (currentUser == null) throw Exception('User not authenticated');
+    final cardData = card.toMap();
+    cardData.remove('id');
+    cardData.remove('created_at');
+    cardData.remove('updated_at');
+    await _firestore
+        .collection('users')
+        .doc(currentUser!.uid)
+        .collection('cards')
+        .doc(card.id)
+        .update(cardData);
   }
 
-  Future<void> deleteFlashcard(String id) async {
-    await _firestore.collection('flashcards').doc(id).delete();
+  Future<void> deleteCard(String id) async {
+    if (currentUser == null) throw Exception('User not authenticated');
+    await _firestore
+        .collection('users')
+        .doc(currentUser!.uid)
+        .collection('cards')
+        .doc(id)
+        .delete();
   }
 
   Future<List<Flashcard>> fetchDueCards() async {
     if (currentUser == null) throw Exception('User not authenticated');
     final now = DateTime.now().millisecondsSinceEpoch;
     final snapshot = await _firestore
+        .collection('users')
+        .doc(currentUser!.uid)
         .collection('cards')
-        .where('user_id', isEqualTo: currentUser!.uid)
         .where('srs_next_review_date', isLessThanOrEqualTo: now)
         .orderBy('srs_next_review_date')
         .get();
-    return snapshot.docs.map((doc) => Flashcard.fromMap(doc.data())).toList();
+    return snapshot.docs.map((doc) {
+      final data = {...doc.data(), 'id': doc.id};
+      return Flashcard.fromMap(data);
+    }).toList();
   }
 
-  Future<void> insertCard(Flashcard card) async {
-    if (currentUser == null) throw Exception('User not authenticated');
-    final cardData = {
-      'user_id': currentUser!.uid,
-      'word': card.word,
-      'target_language_code': card.targetLanguageCode,
-      'translation': card.translation,
-      'native_language_code': card.nativeLanguageCode,
-      'image_url': card.imageUrl,
-      'cached_image_path': card.cachedImagePath,
-      'srs_interval': card.srsInterval,
-      'srs_ease_factor': card.srsEaseFactor,
-      'srs_next_review_date': card.srsNextReviewDate,
-      'srs_last_review_date': card.srsLastReviewDate,
-      'created_at': FieldValue.serverTimestamp(),
-    };
-    await _firestore.collection('cards').add(cardData);
+  Future<List<FlashcardStack>> getStacks() async {
+    if (currentUser == null) return [];
+    final snapshot = await _firestore
+        .collection('users')
+        .doc(currentUser!.uid)
+        .collection('stacks')
+        .orderBy('created_at')
+        .get();
+    return snapshot.docs.map((doc) {
+      final data = {...doc.data(), 'id': doc.id};
+      return FlashcardStack.fromMap(data);
+    }).toList();
   }
 
-  Future<void> updateCard(Flashcard card) async {
+  Future<void> createStack(FlashcardStack stack) async {
     if (currentUser == null) throw Exception('User not authenticated');
-    final cardData = {
-      'word': card.word,
-      'target_language_code': card.targetLanguageCode,
-      'translation': card.translation,
-      'native_language_code': card.nativeLanguageCode,
-      'image_url': card.imageUrl,
-      'cached_image_path': card.cachedImagePath,
-      'srs_interval': card.srsInterval,
-      'srs_ease_factor': card.srsEaseFactor,
-      'srs_next_review_date': card.srsNextReviewDate,
-      'srs_last_review_date': card.srsLastReviewDate,
-    };
-    // You must know the Firestore document ID for update
-    // This assumes card.id is the Firestore doc ID
-    await _firestore.collection('cards').doc(card.id).update(cardData);
+    final cardData = stack.toMap();
+    cardData['created_at'] = FieldValue.serverTimestamp();
+    cardData.remove('id');
+    await _firestore
+        .collection('users')
+        .doc(currentUser!.uid)
+        .collection('stacks')
+        .add(cardData);
+  }
+
+  Future<void> updateStack(FlashcardStack stack) async {
+    if (currentUser == null) throw Exception('User not authenticated');
+    final cardData = stack.toMap();
+    cardData.remove('id');
+    cardData.remove('created_at');
+    cardData.remove('updated_at');
+    await _firestore
+        .collection('users')
+        .doc(currentUser!.uid)
+        .collection('stacks')
+        .doc(stack.id)
+        .update(cardData);
+  }
+
+  Future<void> deleteStack(String id) async {
+    if (currentUser == null) throw Exception('User not authenticated');
+    await _firestore
+        .collection('users')
+        .doc(currentUser!.uid)
+        .collection('stacks')
+        .doc(id)
+        .delete();
   }
 
   // Example: If you need to call a cloud function, use Firebase Functions package (not included here)

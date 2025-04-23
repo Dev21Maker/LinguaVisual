@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:lingua_visual/providers/connectivity_provider.dart';
+import 'package:lingua_visual/providers/navigator_provider.dart';
 import 'package:lingua_visual/screens/games/games_view.dart';
 import 'package:lingua_visual/screens/games/srs/learn_screen.dart';
 import 'package:lingua_visual/screens/progress/progress_screen.dart';
@@ -87,56 +88,6 @@ class AppTheme {
 
 class MyApp extends HookConsumerWidget {
   const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final settings = ref.watch(settingsProvider);
-    final themeMode = settings.isDarkMode ? ThemeMode.dark : ThemeMode.light;
-
-    useEffect(() {
-      final connectivity = Connectivity();
-      // Initial connectivity check
-      ConnectivityService.checkConnectivity().then((hasConnection) {
-        ref.read(isOnlineProvider.notifier).state = hasConnection;
-      });
-      
-      // Listen for connectivity changes
-      final subscription = connectivity.onConnectivityChanged.listen((result) {
-        final hasConnection = result != ConnectivityResult.none;
-        ref.read(isOnlineProvider.notifier).state = hasConnection;
-      });
-      
-      return subscription.cancel;
-    }, const []);
-
-    return MaterialApp(
-      title: 'LinguaVisual',
-      theme: _buildTheme(const AppTheme(isDark: false)),
-      darkTheme: _buildTheme(const AppTheme(isDark: true)),
-      themeMode: themeMode,
-      home: Consumer(
-        builder: (context, ref, child) {
-          final isOnline = ref.watch(isOnlineProvider);
-          if (!isOnline) return const OfflineHomeScreen();
-          
-          return StreamBuilder<User?>(
-            stream: FirebaseAuth.instance.authStateChanges(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const LoadingScreen();
-              }
-
-              if (snapshot.hasData) {
-                return const HomeScreen();
-              }
-
-              return const LoginScreen();
-            },
-          );
-        },
-      ),
-    );
-  }
 
   ThemeData _buildTheme(AppTheme theme) {
     return ThemeData(
@@ -236,6 +187,59 @@ class MyApp extends HookConsumerWidget {
           color: theme.onBackground.withOpacity(0.8),
           fontSize: 14,
         ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final navigatorKey = ref.watch(navigatorKeyProvider);
+    
+    final settings = ref.watch(settingsProvider);
+    final themeMode = settings.isDarkMode ? ThemeMode.dark : ThemeMode.light;
+
+    useEffect(() {
+      final connectivity = Connectivity();
+      // Initial connectivity check
+      ConnectivityService.checkConnectivity().then((hasConnection) {
+        ref.read(isOnlineProvider.notifier).state = hasConnection;
+      });
+      
+      // Listen for connectivity changes
+      final subscription = connectivity.onConnectivityChanged.listen((result) {
+        final hasConnection = result != ConnectivityResult.none;
+        ref.read(isOnlineProvider.notifier).state = hasConnection;
+      });
+      
+      return subscription.cancel;
+    }, const []);
+
+    return MaterialApp(
+      navigatorKey: navigatorKey,
+      title: 'LinguaVisual',
+      theme: _buildTheme(const AppTheme(isDark: false)),
+      darkTheme: _buildTheme(const AppTheme(isDark: true)),
+      themeMode: themeMode,
+      home: Consumer(
+        builder: (context, ref, child) {
+          final isOnline = ref.watch(isOnlineProvider);
+          if (!isOnline) return const OfflineHomeScreen();
+          
+          return StreamBuilder<User?>(
+            stream: FirebaseAuth.instance.authStateChanges(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const LoadingScreen();
+              }
+
+              if (snapshot.hasData) {
+                return const HomeScreen();
+              }
+
+              return const LoginScreen();
+            },
+          );
+        },
       ),
     );
   }

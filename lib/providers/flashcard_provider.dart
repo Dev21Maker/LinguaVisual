@@ -1,5 +1,8 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lingua_visual/providers/firebase_provider.dart';
+import 'package:lingua_visual/providers/navigator_provider.dart';
+import 'package:lingua_visual/widgets/image_prompt_dialog.dart';
 // import 'package:uuid/uuid.dart';
 import '../models/online_flashcard.dart';
 // import 'database_provider.dart'; // now using Firestore
@@ -216,10 +219,50 @@ class FlashcardStateNotifier extends StateNotifier<AsyncValue<List<OnlineFlashca
     try {
       final firebaseService = ref.read(firebaseServiceProvider);
       await firebaseService.insertCard(flashcard);
-      await _loadFlashcards(); // Reload the flashcards after adding
+      await _loadFlashcards();
+      _checkForMissingImages();
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }
+  }
+
+  Future<void> _checkForMissingImages() async {
+    if (state.value == null) return;
+    
+    final cardsWithoutImages = state.value!
+        .where((card) => card.imageUrl == null)
+        .toList();
+
+    if (cardsWithoutImages.isEmpty) return;
+
+    // Get the BuildContext from a navigator key or similar global key
+    final context = ref.read(navigatorKeyProvider).currentContext;
+    if (context == null) return;
+
+    for (final card in cardsWithoutImages) {
+      final imageUrl = await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => ImagePromptDialog(
+          word: card.word,
+          onImageSelected: (url) async {
+            // Update the flashcard with the new image URL
+            final updatedCard = card.copyWith(imageUrl: url);
+            final firebaseService = ref.read(firebaseServiceProvider);
+            await firebaseService.updateCard(updatedCard);
+            await _loadFlashcards();
+          },
+        ),
+      );
+
+      if (imageUrl != null) {
+        final updatedCard = card.copyWith(imageUrl: imageUrl);
+        final firebaseService = ref.read(firebaseServiceProvider);
+        await firebaseService.updateCard(updatedCard);
+      }
+    }
+    
+    await _loadFlashcards();
   }
 
   Future<void> removeFlashcard(String id) async {

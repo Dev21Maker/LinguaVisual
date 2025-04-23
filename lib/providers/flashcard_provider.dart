@@ -1,20 +1,19 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lingua_visual/providers/settings_provider.dart';
-import 'package:lingua_visual/providers/supabase_provider.dart';
+import 'package:lingua_visual/providers/firebase_provider.dart';
 // import 'package:uuid/uuid.dart';
-import '../models/flashcard.dart';
+import '../models/online_flashcard.dart';
 // import 'database_provider.dart'; // now using Firestore
 // import 'api_provider.dart';
 // import 'srs_provider.dart';
 import '../services/recraft_api_service.dart';
 
 // Existing providers
-final flashcardsProvider = FutureProvider<List<Flashcard>>((ref) async {
+final flashcardsProvider = FutureProvider<List<OnlineFlashcard>>((ref) async {
   final firebaseService = ref.watch(firebaseServiceProvider);
   return await firebaseService.getFlashcards();
 });
 
-final dueFlashcardsProvider = FutureProvider<List<Flashcard>>((ref) async {
+final dueFlashcardsProvider = FutureProvider<List<OnlineFlashcard>>((ref) async {
   final firebaseService = ref.watch(firebaseServiceProvider);
   return await firebaseService.fetchDueCards();
 });
@@ -23,8 +22,8 @@ final recraftApiProvider = Provider((ref) => RecraftApiService());
 
 // New providers for managing active learning state
 class ActiveLearningState {
-  final List<Flashcard> dueCards;
-  final Flashcard? currentCard;
+  final List<OnlineFlashcard> dueCards;
+  final OnlineFlashcard? currentCard;
   final bool isLoading;
   final String? error;
 
@@ -36,8 +35,8 @@ class ActiveLearningState {
   });
 
   ActiveLearningState copyWith({
-    List<Flashcard>? dueCards,
-    Flashcard? currentCard,
+    List<OnlineFlashcard>? dueCards,
+    OnlineFlashcard? currentCard,
     bool? isLoading,
     String? error,
   }) {
@@ -107,7 +106,7 @@ class ActiveLearningNotifier extends StateNotifier<ActiveLearningState> {
       //   print('Failed to generate image: $e');
       // }
 
-      // final flashcard = Flashcard(
+      // final flashcard = OnlineFlashcard(
       //   id: wordData['id'],
       //   word: wordData['word'],
       //   targetLanguageCode: settings.targetLanguage.code,
@@ -130,7 +129,7 @@ class ActiveLearningNotifier extends StateNotifier<ActiveLearningState> {
     try {
       if (state.currentCard == null) return;
       
-      final newDueCards = List<Flashcard>.from(state.dueCards)..removeAt(0);
+      final newDueCards = List<OnlineFlashcard>.from(state.dueCards)..removeAt(0);
       state = state.copyWith(
         dueCards: newDueCards,
         currentCard: newDueCards.isNotEmpty ? newDueCards.first : null,
@@ -192,11 +191,11 @@ class FlashcardViewNotifier extends StateNotifier<FlashcardViewState> {
 }
 
 // Add this to your existing providers
-final flashcardStateProvider = StateNotifierProvider<FlashcardStateNotifier, AsyncValue<List<Flashcard>>>((ref) {
+final flashcardStateProvider = StateNotifierProvider<FlashcardStateNotifier, AsyncValue<List<OnlineFlashcard>>>((ref) {
   return FlashcardStateNotifier(ref);
 });
 
-class FlashcardStateNotifier extends StateNotifier<AsyncValue<List<Flashcard>>> {
+class FlashcardStateNotifier extends StateNotifier<AsyncValue<List<OnlineFlashcard>>> {
   final Ref ref;
 
   FlashcardStateNotifier(this.ref) : super(const AsyncValue.loading()) {
@@ -206,14 +205,14 @@ class FlashcardStateNotifier extends StateNotifier<AsyncValue<List<Flashcard>>> 
   Future<void> _loadFlashcards() async {
     try {
       final firebaseService = ref.read(firebaseServiceProvider);
-      final List<Flashcard> flashcards = await firebaseService.getFlashcards();
+      final List<OnlineFlashcard> flashcards = await firebaseService.getFlashcards();
       state = AsyncValue.data(flashcards);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }
   }
 
-  Future<void> addFlashcard(Flashcard flashcard) async {
+  Future<void> addFlashcard(OnlineFlashcard flashcard) async {
     try {
       final firebaseService = ref.read(firebaseServiceProvider);
       await firebaseService.insertCard(flashcard);
@@ -233,7 +232,7 @@ class FlashcardStateNotifier extends StateNotifier<AsyncValue<List<Flashcard>>> 
     }
   }
 
-  Future<void> updateFlashcard(Flashcard flashcard) async {
+  Future<void> updateFlashcard(OnlineFlashcard flashcard) async {
     try {
       final firebaseService = ref.read(firebaseServiceProvider);
       await firebaseService.updateCard(flashcard);

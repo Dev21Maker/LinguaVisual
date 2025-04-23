@@ -1,19 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:lingua_visual/models/flashcard.dart';
 
-class FlashcardTile extends StatefulWidget {
+class FlashcardTile<T extends Flashcard> extends StatefulWidget {
   const FlashcardTile({
     required this.card,
     required this.translationVisible,
     required this.changeTranslationVisibility,
     required this.showMoveToStackDialog,
+    required this.getEmoji,
     super.key, 
   });
 
-  final Flashcard card;
+  final T card;
   final ValueNotifier<Map<String, bool>> translationVisible;
   final Function(String) changeTranslationVisibility;
   final VoidCallback showMoveToStackDialog;
+  final String Function() getEmoji;
 
   @override
   State<FlashcardTile> createState() => _FlashcardTileState();
@@ -84,7 +86,7 @@ class _FlashcardTileState extends State<FlashcardTile> {
                         ),
                         Padding(padding: const EdgeInsets.symmetric(horizontal: 8),
                           child: Text(
-                            widget.card.targetLanguage.emoji,
+                            widget.getEmoji.call(),
                             style: const TextStyle(
                               fontSize: 20,
                             ),

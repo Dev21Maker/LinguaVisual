@@ -51,3 +51,4 @@ final List<Language> supportedLanguages = [
   Language(code: 'zh', name: 'Chinese', nativeName: '中文', emoji: '🇨🇳'),
   Language(code: 'ko', name: 'Korean', nativeName: '한국어', emoji: '🇰🇷'),
 ];
+

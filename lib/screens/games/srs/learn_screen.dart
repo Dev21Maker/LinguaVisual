@@ -1,13 +1,12 @@
 import 'dart:async';
-
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:lingua_visual/main.dart';
-import 'package:lingua_visual/models/flashcard.dart';
 import 'package:lingua_visual/providers/flashcard_provider.dart';
-import 'package:lingua_visual/providers/settings_provider.dart';
-import 'package:lingua_visual/providers/auth_provider.dart' as auth_prov;
+import 'package:lingua_visual/providers/offline_flashcard_provider.dart';
+import 'package:lingua_visual/providers/connectivity_provider.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:lingua_visual/providers/stack_provider.dart';
 import 'package:multi_language_srs/multi_language_srs.dart';
 import 'package:lingua_visual/widgets/flashcard_view.dart';
 
@@ -16,350 +15,262 @@ class LearnScreen extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final dueCardsState = useState<List<Flashcard>>([]);
+    final dueItemsState = useState<List<FlashcardItem>>([]);
+    final reviewedCards = useState<Map<String, (FlashcardItem, String)>>({});
     final isLoadingState = useState(true);
     final errorState = useState<String?>(null);
     final showEmptyState = useState(false);
-    final settings = ref.watch(settingsProvider);
-    final srsManager = useMemoized(() => SRSManager());
+    final selectedStackId = useState<String?>(null);
+    final isSessionComplete = useState(false);
+    final srsManager = useMemoized(() => SRSManager(), []);
+    final isOnline = ref.watch(isOnlineProvider);
 
-    // --- Flashcard login/session refresh logic ---
-    final _loginTimer = useRef<Timer?>(null);
-    final authService = ref.read(auth_prov.authServiceProvider);
-    final isMounted = useIsMounted();
-
-    Future<void> refreshSession() async {
-      try {
-        await authService.initializeAuthState();
-      } catch (e) {
-        if (isMounted()) {
-          errorState.value = 'Session expired. Please log in again.';
-        }
-      }
-    }
-
+    // Effect to save reviewed cards when leaving screen
     useEffect(() {
-      // Initial session refresh
-      refreshSession();
-      // Start periodic refresh every 7 seconds
-      _loginTimer.value = Timer.periodic(const Duration(seconds: 7), (_) {
-        refreshSession();
-      });
-      return () {
-        _loginTimer.value?.cancel();
+      return () async {
+        if (reviewedCards.value.isNotEmpty) {
+          final isOnline = ref.read(isOnlineProvider);
+          
+          for (final entry in reviewedCards.value.entries) {
+            final (flashcardItem, rating) = entry.value;
+            try {
+              if (isOnline) {
+                final cardToUpdate = ref.read(flashcardStateProvider).value?.firstWhere((card) => card.id == flashcardItem.id);
+                if (cardToUpdate != null) {
+                  final updatedCard = cardToUpdate.copyWith(
+                    srsInterval: flashcardItem.interval.toDouble(),
+                    srsEaseFactor: flashcardItem.easeFactor,
+                    srsNextReviewDate: flashcardItem.nextReviewDate.millisecondsSinceEpoch,
+                  );
+                  await ref.read(flashcardStateProvider.notifier).updateFlashcard(updatedCard);
+                }
+              } else {
+                final cardToUpdate = ref.read(offlineFlashcardsProvider).value?.firstWhere((card) => card.id == flashcardItem.id);
+                if (cardToUpdate != null) {
+                  final updatedCard = cardToUpdate.copyWith(
+                    srsInterval: flashcardItem.interval.toDouble(),
+                    srsEaseFactor: flashcardItem.easeFactor,
+                    srsNextReviewDate: flashcardItem.nextReviewDate.microsecondsSinceEpoch,
+                  );
+                  await ref.read(offlineFlashcardsProvider.notifier).updateCard(updatedCard);
+                }
+              }
+            } catch (e) {
+              print('Failed to save reviewed card: $e');
+            }
+          }
+        }
       };
-    }, const []);
-
-    // --- End flashcard login/session refresh logic ---
+    }, []);
 
     Future<void> loadDueCards() async {
-      // Reset states
       isLoadingState.value = true;
       errorState.value = null;
       showEmptyState.value = false;
-      dueCardsState.value = [];
-      
-      // Start a timer to show empty state after 7 seconds
-      Future.delayed(const Duration(seconds: 7), () {
+      dueItemsState.value = [];
+
+      final emptyStateTimer = Timer(const Duration(seconds: 7), () {
         if (isLoadingState.value) {
           showEmptyState.value = true;
         }
       });
 
       try {
-        // Fetch due items from SRS package and sort by earliest nextReviewDate
-        final srsItems = srsManager.getDueItems(
-          DateTime.now(),
-          languageId: settings.targetLanguage.code,
+        final flashcardsAsync = isOnline 
+            ? ref.read(flashcardStateProvider) 
+            : ref.read(offlineFlashcardsProvider);
+
+        flashcardsAsync.when(
+          data: (cards) {
+            // Get all cards if no stack is selected, otherwise filter by stack
+            final filteredCards = selectedStackId.value == null
+                ? cards  // Use all cards
+                : cards.where((card) {
+                    final stack = ref.watch(stacksProvider).value?.firstWhere(
+                      (s) => s.id == selectedStackId.value,
+                    );
+                    return stack?.flashcardIds.contains(card.id) ?? false;
+                  }).toList();
+            
+            srsManager.clear();
+            
+            for (final card in filteredCards) {
+              final flashcardItem = FlashcardItem(
+                id: card.id,
+                question: card.word,
+                answer: card.translation,
+                languageId: card.targetLanguageCode,
+                interval: card.interval.toInt(),
+                easeFactor: card.easeFactor,
+                nextReviewDate: card.nextReviewDate,
+                reviews: 0,
+              );
+              srsManager.addItem(flashcardItem);
+            }
+
+            final dueItems = srsManager.getDueItems(DateTime.now());
+            dueItemsState.value = dueItems;
+            
+            if (dueItems.isEmpty) {
+              showEmptyState.value = true;
+            }
+            
+            isLoadingState.value = false;
+            emptyStateTimer.cancel();
+          },
+          loading: () {
+            isLoadingState.value = true;
+          },
+          error: (error, stack) {
+            errorState.value = error.toString();
+            isLoadingState.value = false;
+            emptyStateTimer.cancel();
+          },
         );
-        srsItems.sort((a, b) => a.nextReviewDate.compareTo(b.nextReviewDate));
-        dueCardsState.value = srsItems.map((item) => Flashcard(
-          id: item.id,
-          word: item.question,
-          targetLanguage: settings.targetLanguage,
-          translation: item.answer,
-          nativeLanguage: settings.nativeLanguage,
-          srsInterval: item.interval.toDouble(),
-          srsEaseFactor: item.easeFactor,
-          srsNextReviewDate: item.nextReviewDate.millisecondsSinceEpoch,
-        )).toList();
       } catch (e) {
         errorState.value = e.toString();
-      } finally {
         isLoadingState.value = false;
+        emptyStateTimer.cancel();
       }
     }
 
+    // Effect to load cards when stack selection changes
     useEffect(() {
       loadDueCards();
-      return null;
-    }, const []);
-
-    if (isLoadingState.value) {
-      if (showEmptyState.value) {
-        return Scaffold(
-          body: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.school_outlined,
-                  size: 64,
-                  color: Colors.grey,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Taking longer than expected...',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Check your internet connection',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.grey,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-                const CircularProgressIndicator(),
-                const SizedBox(height: 24),
-                IconButton(
-                  onPressed: () {
-                    showEmptyState.value = false;
-                    isLoadingState.value = true;
-                    loadDueCards();
-                  },
-                  icon: const Icon(Icons.refresh),
-                  style: IconButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                    padding: const EdgeInsets.all(16),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      }
-      return const LoadingScreen();
-    }
-
-    if (errorState.value != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              'Error loading cards',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              errorState.value!,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.error,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: loadDueCards,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Try Again'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (isLoadingState.value || dueCardsState.value.isEmpty) {
-      return Center(
-        child: isLoadingState.value
-            ? const LoadingScreen()
-            : Text('No cards due for review!'),
-      );
-    }
-
-    // --- Flashcard study logic with 7-second timeout ---
-    final currentIndex = useState(0);
-    final cardTimer = useRef<Timer?>(null);
-    final isSessionComplete = useState(false);
-
-    void nextCard() {
-      if (currentIndex.value < dueCardsState.value.length - 1) {
-        currentIndex.value++;
-      } else {
-        isSessionComplete.value = true;
-      }
-    }
-
-    void startCardTimer() {
-      cardTimer.value?.cancel();
-      cardTimer.value = Timer(const Duration(seconds: 7), nextCard);
-    }
-
-    useEffect(() {
-      if (!isSessionComplete.value) {
-        startCardTimer();
-      } else {
-        cardTimer.value?.cancel();
-      }
-      return () {
-        cardTimer.value?.cancel();
-      };
-    }, [currentIndex.value, isSessionComplete.value]);
-
-    if (isSessionComplete.value) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Session Complete')),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Card(
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? const Color(0xFF23272F)
-                    : Colors.white,
-                elevation: 12,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(32),
-                  side: BorderSide(
-                    color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
-                    width: 2,
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(32.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.celebration, size: 64, color: Theme.of(context).colorScheme.primary),
-                      const SizedBox(height: 24),
-                      Text('You have finished all due flashcards!',
-                          style: Theme.of(context).textTheme.headlineMedium,
-                          textAlign: TextAlign.center),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              TextButton.icon(
-                onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.home_outlined, size: 20),
-                label: const Text('Go Home'),
-                style: TextButton.styleFrom(
-                  foregroundColor: Theme.of(context).colorScheme.primary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    final flashcard = dueCardsState.value[currentIndex.value];
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardBg = Theme.of(context).colorScheme.surface;
-    final borderColor = Theme.of(context).colorScheme.primary;
-    final textColor = Theme.of(context).colorScheme.onSurface;
+      return;
+    }, [selectedStackId.value]);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Learn')),
-      body: Center(
+      appBar: AppBar(
+        title: ref.watch(stacksProvider).when(
+          data: (stacks) {
+            if (selectedStackId.value == null) {
+              return Text('All Cards ${isOnline ? "" : "(Offline)"}');
+            }
+            final stackName = stacks
+                .firstWhere((s) => s.id == selectedStackId.value)
+                .name;
+            return Text('Learning: $stackName ${isOnline ? "" : "(Offline)"}');
+          },
+          loading: () => const Text('Learning'),
+          error: (_, __) => const Text('Learning'),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.filter_list),
+            onPressed: () => _showStackSelector(context, ref, selectedStackId, loadDueCards),
+          ),
+        ],
+      ),
+      body: _buildBody(
+        context,
+        isLoadingState.value,
+        errorState.value,
+        dueItemsState.value,
+        showEmptyState.value,
+        selectedStackId,
+        loadDueCards,
+        isSessionComplete,
+        reviewedCards,
+        dueItemsState,
+      ),
+    );
+  }
+
+  void _showStackSelector(
+    BuildContext context,
+    WidgetRef ref,
+    ValueNotifier<String?> selectedStackId,
+    VoidCallback onStackSelected,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 20),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // Progress indicator
-            Builder(
-              builder: (context) {
-                final total = dueCardsState.value.length;
-                final groupSize = 10;
-                final group = currentIndex.value ~/ groupSize;
-                final start = group * groupSize;
-                final end = (start + groupSize > total) ? total : start + groupSize;
-                return Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (start > 0)
-                      const Text('... ', style: TextStyle(fontWeight: FontWeight.bold)),
-                    ...List.generate(end - start, (i) {
-                      final idx = start + i;
-                      return Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 3),
-                        width: 10,
-                        height: 10,
-                        decoration: BoxDecoration(
-                          color: idx == currentIndex.value
-                              ? borderColor
-                              : borderColor.withOpacity(0.3),
-                          shape: BoxShape.circle,
-                        ),
-                      );
-                    }),
-                    if (end < total)
-                      const Text(' ...', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ],
-                );
-              },
-            ),
-            const SizedBox(height: 32),
-            // Flashcard
-            Expanded(
-              child: FlashcardView(
-                flashcards: [flashcard],
-                onRatingSelected: (rating, flashcard) async {
-                  // Cancel the auto-advance timer when user rates
-                  cardTimer.value?.cancel();
-                  
-                  try {
-                    // Update the card's SRS data in Supabase
-                    await ref.read(activeLearningProvider.notifier).processCardRating(rating);
-                    
-                    // Move to next card
-                    nextCard();
-                    
-                    // Start the timer for the next card
-                    if (!isSessionComplete.value) {
-                      startCardTimer();
-                    }
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Error updating card: ${e.toString()}'),
-                          backgroundColor: Theme.of(context).colorScheme.error,
-                        ),
-                      );
-                    }
-                  }
-                },
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Select Stack',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 24),
-            Text('Card ${currentIndex.value + 1} of ${dueCardsState.value.length}',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: borderColor)),
-            const SizedBox(height: 24),
+            const Divider(),
+            Expanded(
+              child: ref.watch(stacksProvider).when(
+                data: (stacks) => ListView(
+                  children: [
+                    ListTile(
+                      leading: const CircleAvatar(
+                        child: Icon(Icons.all_inclusive),
+                      ),
+                      title: const Text('All Cards'),
+                      selected: selectedStackId.value == null,
+                      onTap: () {
+                        selectedStackId.value = null;
+                        onStackSelected();
+                        Navigator.pop(context);
+                      },
+                    ),
+                    if (stacks.isNotEmpty) const Divider(),
+                    ...stacks.map(
+                      (stack) => ListTile(
+                        leading: const CircleAvatar(
+                          child: Icon(Icons.folder),
+                        ),
+                        title: Text(stack.name),
+                        subtitle: Text(
+                          '${stack.flashcardIds.length} cards',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        selected: stack.id == selectedStackId.value,
+                        onTap: () {
+                          selectedStackId.value = stack.id;
+                          onStackSelected();
+                          Navigator.pop(context);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (_, __) => const Center(
+                  child: Text('Error loading stacks'),
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
-    // --- End flashcard study logic ---
   }
 
   Widget _buildBody(
     BuildContext context,
-    WidgetRef ref, {
-    required bool isLoading,
-    required String? error,
-    required Flashcard? currentCard,
-    required List<Flashcard> dueCards,
-    required Future<void> Function(String rating) onRatingSelected,
-  }) {
+    bool isLoading,
+    String? error,
+    List<FlashcardItem> dueItems,
+    bool showEmpty,
+    ValueNotifier<String?> selectedStackId,
+    VoidCallback loadDueCards,
+    ValueNotifier<bool> isSessionComplete,
+    ValueNotifier<Map<String, (FlashcardItem, String)>> reviewedCards,
+    ValueNotifier<List<FlashcardItem>> dueItemsState,
+  ) {
     if (isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -369,81 +280,94 @@ class LearnScreen extends HookConsumerWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              'Error loading cards',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              error,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.error,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () => ref.read(activeLearningProvider.notifier).loadDueCards(),
-              icon: const Icon(Icons.refresh),
-              label: const Text('Try Again'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
-                ),
-              ),
+            const Icon(Icons.error_outline, size: 64, color: Colors.red),
+            const SizedBox(height: 16),
+            Text('Error: $error'),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: loadDueCards,
+              child: const Text('Retry'),
             ),
           ],
         ),
       );
     }
 
-    if (currentCard == null) {
+    if (dueItems.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            const Icon(Icons.check_circle_outline, size: 64, color: Colors.green),
+            const SizedBox(height: 16),
             Text(
-              'No cards due for review',
+              showEmpty ? 'No cards due for review!' : 'Loading cards...',
               style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Great job! Take a break or check back later.',
-              style: Theme.of(context).textTheme.bodyMedium,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () => ref.read(activeLearningProvider.notifier).loadDueCards(),
-              icon: const Icon(Icons.refresh),
-              label: const Text('Check Again'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
-                ),
-              ),
             ),
           ],
         ),
       );
     }
 
-    return Column(
-      children: [
-        Text(
-          'Cards remaining: ${dueCards.length}',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: 16),
-        Expanded(
-          child: FlashcardView(
-            flashcards: [currentCard],  // Wrap in list
-            onRatingSelected: (rating, flashcard) => onRatingSelected(rating),
-          ),
-        ),
-      ],
+    // Your existing flashcard review UI here
+    return Consumer(
+      builder: (context, ref, _) {
+        return FlashcardView(
+          flashcards: dueItems,
+          onRatingSelected: (rating, flashcard) {
+            // Calculate new SRS parameters based on the rating
+            double newInterval;
+            double newEaseFactor = flashcard.easeFactor;
+            const minimumEaseFactor = 1.3;
+
+            switch (rating.toLowerCase()) {
+              case 'again':
+                newInterval = 1.0;
+                newEaseFactor = max(minimumEaseFactor, flashcard.easeFactor - 0.2);
+                break;
+              case 'hard':
+                newInterval = flashcard.interval * 1.2;
+                newEaseFactor = max(minimumEaseFactor, flashcard.easeFactor - 0.15);
+                break;
+              case 'good':
+                newInterval = flashcard.interval * flashcard.easeFactor;
+                break;
+              case 'easy':
+                newInterval = flashcard.interval * flashcard.easeFactor * 1.3;
+                newEaseFactor = min(2.5, flashcard.easeFactor + 0.15);
+                break;
+              default:
+                newInterval = flashcard.interval.toDouble();
+            }
+
+            // Create updated FlashcardItem
+            final updatedItem = FlashcardItem(
+              id: flashcard.id,
+              question: flashcard.question,
+              answer: flashcard.answer,
+              languageId: flashcard.languageId,
+              interval: newInterval.toInt(),
+              easeFactor: newEaseFactor,
+              nextReviewDate: DateTime.now().add(Duration(days: newInterval.toInt())),
+              reviews: flashcard.reviews + 1,
+            );
+
+            // Store the reviewed card and update state
+            final newReviewedCards = {...reviewedCards.value};
+            newReviewedCards[flashcard.id] = (updatedItem, rating);
+            reviewedCards.value = newReviewedCards;
+
+            // Remove card from due items
+            final newDueItems = dueItemsState.value.where((item) => item.id != flashcard.id).toList();
+            dueItemsState.value = newDueItems;
+
+            // Check if session is complete
+            if (newDueItems.isEmpty) {
+              isSessionComplete.value = true;
+            }
+          },
+        );
+      },
     );
   }
 }

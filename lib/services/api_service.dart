@@ -2,11 +2,11 @@ import 'package:dio/dio.dart';
 import '../models/word_request.dart';
 import '../models/word_response.dart';
 
-class ApiService {
+class ImageApiService {
   static const String _baseUrl = 'YOUR_BACKEND_API_URL'; // Replace with actual API URL
   final Dio _dio;
 
-  ApiService()
+  ImageApiService()
       : _dio = Dio(
           BaseOptions(
             baseUrl: _baseUrl,

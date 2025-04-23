@@ -3,6 +3,8 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:lingua_visual/models/flashcard.dart';
 import 'package:lingua_visual/models/flashcard_stack.dart';
+import 'package:lingua_visual/models/language.dart';
+import 'package:lingua_visual/providers/connectivity_provider.dart';
 import 'package:lingua_visual/providers/flashcard_provider.dart';
 import 'package:lingua_visual/providers/stack_provider.dart';
 import 'package:lingua_visual/widgets/flashcard_tile.dart';
@@ -371,6 +373,13 @@ class FlashcardScreen extends HookConsumerWidget {
                             card,
                             selectedStackId.value,
                           ),
+                getEmoji: () {
+                  if(ref.read(isOnlineProvider.notifier).state) {
+                    return card.targetLanguage.emoji;
+                  } else {
+                    return supportedLanguages.firstWhere((element) => element.code == card.targetLanguageCode,).emoji;
+                  }
+                },
               );
             },
           );

@@ -2,16 +2,18 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../models/flashcard.dart';
+import 'package:multi_language_srs/multi_language_srs.dart';
 
 class FlashcardView extends StatefulWidget {
-  final List<Flashcard> flashcards;
-  final Function(String, Flashcard) onRatingSelected;
+  final List<FlashcardItem> flashcards;
+  final Function(String, FlashcardItem) onRatingSelected;
+  final String? imageUrl;
 
   const FlashcardView({
     super.key,
     required this.flashcards,
     required this.onRatingSelected,
+    this.imageUrl,
   });
 
   @override
@@ -62,7 +64,7 @@ class _FlashcardViewState extends State<FlashcardView> {
     );
   }
 
-  Widget _buildFlashcard(Flashcard flashcard) {
+  Widget _buildFlashcard(FlashcardItem flashcard) {
     return GestureDetector(
       onTap: () => _toggleCard(flashcard.id),
       child: TweenAnimationBuilder(
@@ -133,11 +135,11 @@ class _FlashcardViewState extends State<FlashcardView> {
     );
   }
 
-  Widget _buildFrontContent(Flashcard flashcard) {
+  Widget _buildFrontContent(FlashcardItem flashcard) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        if (flashcard.imageUrl != null)
+        if (widget.imageUrl != null)
           Expanded(
             flex: 2,
             child: Padding(
@@ -145,7 +147,7 @@ class _FlashcardViewState extends State<FlashcardView> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: CachedNetworkImage(
-                  imageUrl: flashcard.imageUrl!,
+                  imageUrl: widget.imageUrl!,
                   fit: BoxFit.contain,
                   placeholder: (context, url) => const Center(
                     child: CircularProgressIndicator(),
@@ -164,7 +166,7 @@ class _FlashcardViewState extends State<FlashcardView> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  flashcard.word,
+                  flashcard.question,
                   style: const TextStyle(
                     fontSize: 28,
                     color: Colors.white,
@@ -174,13 +176,13 @@ class _FlashcardViewState extends State<FlashcardView> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  flashcard.targetLanguage.code.toUpperCase(),
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.7),
-                    fontSize: 16,
-                  ),
-                ),
+                // Text(
+                //   flashcard.targetLanguage.code.toUpperCase(),
+                //   style: TextStyle(
+                //     color: Colors.white.withOpacity(0.7),
+                //     fontSize: 16,
+                //   ),
+                // ),
               ],
             ),
           ),
@@ -189,7 +191,7 @@ class _FlashcardViewState extends State<FlashcardView> {
     );
   }
 
-  Widget _buildBackContent(Flashcard flashcard) {
+  Widget _buildBackContent(FlashcardItem flashcard) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -207,7 +209,7 @@ class _FlashcardViewState extends State<FlashcardView> {
           ),
         ] else ...[
           Text(
-            flashcard.translation,
+            flashcard.answer,
             style: const TextStyle(
               fontSize: 28,
               color: Colors.white,
@@ -217,13 +219,13 @@ class _FlashcardViewState extends State<FlashcardView> {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
-          Text(
-            flashcard.nativeLanguage.code.toUpperCase(),
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.7),
-              fontSize: 16,
-            ),
-          ),
+          // Text(
+          //   flashcard.nativeLanguage.code.toUpperCase(),
+          //   style: TextStyle(
+          //     color: Colors.white.withOpacity(0.7),
+          //     fontSize: 16,
+          //   ),
+          // ),
           const SizedBox(height: 24),
           if (!(hasCheckedAnswer[flashcard.id] ?? false)) ...[
             const Text(
@@ -262,7 +264,7 @@ class _FlashcardViewState extends State<FlashcardView> {
     );
   }
 
-  Widget _buildAnswerButton(String label, Color color, Flashcard flashcard) {
+  Widget _buildAnswerButton(String label, Color color, FlashcardItem flashcard) {
     return ElevatedButton(
       onPressed: () {
         setState(() => hasCheckedAnswer[flashcard.id] = true);
@@ -275,7 +277,7 @@ class _FlashcardViewState extends State<FlashcardView> {
     );
   }
 
-  Widget _buildRatingButton(String label, Color color, Flashcard flashcard) {
+  Widget _buildRatingButton(String label, Color color, FlashcardItem flashcard) {
     return SizedBox(
       width: 80,
       child: ElevatedButton(

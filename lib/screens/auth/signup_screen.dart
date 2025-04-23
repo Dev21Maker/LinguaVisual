@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../providers/supabase_provider.dart'; 
+import '../../providers/firebase_provider.dart'; 
 import '../../services/auth_service.dart';
 
 final authServiceProvider = Provider((ref) => AuthService(ref.watch(firebaseServiceProvider)));

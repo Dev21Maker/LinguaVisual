@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:lingua_visual/main.dart';
+import 'package:lingua_visual/models/flashcard_converters.dart';
+import 'package:lingua_visual/providers/offline_flashcard_provider.dart';
 import '../widgets/flashcard_view.dart';
 
 class OfflineTrainingScreen extends HookConsumerWidget {
@@ -25,16 +25,15 @@ class OfflineTrainingScreen extends HookConsumerWidget {
     Future<void> onRatingSelected(String rating) async {
       // Update SRS data based on rating
       final now = DateTime.now().millisecondsSinceEpoch;
-      final updatedCard = currentCard.copyWith(
+      final updatedOfflineCard = flashcards.value![currentIndex].copyWith(
+        srsNextReviewDate: now + 1000, // Placeholder for actual SRS logic
         srsLastReviewDate: now,
-        srsNextReviewDate:
-            now + (24 * 60 * 60 * 1000), // Next day for simplicity
       );
 
       // Update the card in storage
       await ref
           .read(offlineFlashcardsProvider.notifier)
-          .updateCard(updatedCard);
+          .updateCard(updatedOfflineCard);
 
       // Move to next card or finish
       if (currentIndex < flashcards.value!.length - 1) {
@@ -82,7 +81,7 @@ class OfflineTrainingScreen extends HookConsumerWidget {
         padding: const EdgeInsets.all(16.0),
         child: SafeArea(
           child: FlashcardView(
-            flashcards: [currentCard],  // Wrap in list
+            flashcards: [FlashcardConverters.offlineToFlashcardItem(currentCard)],  // Wrap in list
             onRatingSelected: (rating, _) => onRatingSelected(rating),
           ),
         ),

@@ -1,52 +1,35 @@
-import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:lingua_visual/providers/connectivity_provider.dart';
 import 'package:lingua_visual/screens/games/games_view.dart';
+import 'package:lingua_visual/screens/games/srs/learn_screen.dart';
 import 'package:lingua_visual/screens/progress/progress_screen.dart';
 import 'package:lingua_visual/screens/settings/settings_screen.dart';
-import 'package:lingua_visual/widgets/flashcards_builder.dart';
-import 'screens/flashcards/flashcard_screen.dart';
-import 'screens/offline_training_screen.dart';
-import 'package:lingua_visual/services/sync_service.dart';
-import 'package:lingua_visual/models/flashcard.dart';
+import 'package:lingua_visual/screens/flashcards/flashcard_screen.dart';
 import 'package:lingua_visual/screens/auth/login_screen.dart';
 import 'package:lingua_visual/providers/settings_provider.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
 import 'services/session_cleanup_service.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-// Add this provider to track connectivity state
-final isOnlineProvider = StateProvider<bool>((ref) => false);
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Try to load environment variables, but don't fail if .env is missing
   try {
     await dotenv.load(fileName: ".env");
   } catch (e) {
     debugPrint('Warning: Failed to load .env file: $e');
   }
   
-  // Initialize Firebase
-  try {
-    await Firebase.initializeApp();
-    final container = ProviderContainer();
-    container.read(isOnlineProvider.notifier).state = true;
-  } catch (e) {
-    debugPrint('Warning: Running in offline mode: $e');
-  }
+  await Firebase.initializeApp();
   
-  // Initialize settings provider
   final prefs = await SharedPreferences.getInstance();
   final settingsNotifier = SettingsNotifier(prefs);
 
-  // Clean up session if needed (for keep signed in)
   final sessionCleanupService = SessionCleanupService();
   await sessionCleanupService.cleanupSessionIfNeeded();
 
@@ -113,34 +96,17 @@ class MyApp extends HookConsumerWidget {
     useEffect(() {
       final connectivity = Connectivity();
       // Initial connectivity check
-      connectivity.checkConnectivity().then((result) async {
-        final hasConnection = result != ConnectivityResult.none;
+      ConnectivityService.checkConnectivity().then((hasConnection) {
         ref.read(isOnlineProvider.notifier).state = hasConnection;
-        if (hasConnection) {
-          try {
-            await Firebase.initializeApp();
-          } catch (e) {
-            debugPrint('Error init Firebase: $e');
-          }
-        }
       });
+      
       // Listen for connectivity changes
-      final subscription = connectivity.onConnectivityChanged.listen((result) async {
+      final subscription = connectivity.onConnectivityChanged.listen((result) {
         final hasConnection = result != ConnectivityResult.none;
         ref.read(isOnlineProvider.notifier).state = hasConnection;
-        if (hasConnection) {
-          try {
-            await Firebase.initializeApp();
-            final syncService = ref.read(syncServiceProvider);
-            await syncService.syncOfflineData();
-          } catch (e) {
-            debugPrint('Failed to reconnect: $e');
-          }
-        }
       });
-      return () {
-        subscription.cancel();
-      };
+      
+      return subscription.cancel;
     }, const []);
 
     return MaterialApp(
@@ -157,9 +123,7 @@ class MyApp extends HookConsumerWidget {
             stream: FirebaseAuth.instance.authStateChanges(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Scaffold(
-                  body: Center(child: CircularProgressIndicator()),
-                );
+                return const LoadingScreen();
               }
 
               if (snapshot.hasData) {
@@ -333,15 +297,12 @@ class OfflineHomeScreen extends ConsumerWidget {
                             : () async {
                                 isReconnecting.value = true;
                                 try {
-                                  // Try to initialize Firebase
-                                  await Firebase.initializeApp();
-                                  
                                   // If successful, update online status
                                   ref.read(isOnlineProvider.notifier).state = true;
                                   
                                   // Try to sync offline data if available
-                                  final syncService = ref.read(syncServiceProvider);
-                                  await syncService.syncOfflineData();
+                                  // final syncService = ref.read(syncServiceProvider);
+                                  // await syncService.syncOfflineData();
                                   
                                   if (context.mounted) {
                                     Navigator.pop(context);
@@ -389,8 +350,8 @@ class OfflineHomeScreen extends ConsumerWidget {
           ),
           body: TabBarView(
             children: [
-              const OfflineLearnScreen(),
-              const OfflineFlashcardScreen(),
+              LearnScreen(),
+              FlashcardScreen(),
               SettingsScreen(),
             ],
           ),
@@ -452,195 +413,195 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-class OfflineFlashcardsNotifier extends StateNotifier<AsyncValue<List<Flashcard>>> {
-  OfflineFlashcardsNotifier() : super(const AsyncValue.loading()) {
-    _loadFlashcards();
-  }
+// class OfflineFlashcardsNotifier extends StateNotifier<AsyncValue<List<Flashcard>>> {
+//   OfflineFlashcardsNotifier() : super(const AsyncValue.loading()) {
+//     _loadFlashcards();
+//   }
 
-  Future<void> _loadFlashcards() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final flashcardsJson = prefs.getStringList('offline_flashcards') ?? [];
-      final cards = flashcardsJson
-          .map((json) => Flashcard.fromMap(jsonDecode(json)))
-          .toList();
-      state = AsyncValue.data(cards);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
-  }
+//   Future<void> _loadFlashcards() async {
+//     try {
+//       final prefs = await SharedPreferences.getInstance();
+//       final flashcardsJson = prefs.getStringList('offline_flashcards') ?? [];
+//       final cards = flashcardsJson
+//           .map((json) => Flashcard.fromMap(jsonDecode(json)))
+//           .toList();
+//       state = AsyncValue.data(cards);
+//     } catch (e, st) {
+//       state = AsyncValue.error(e, st);
+//     }
+//   }
 
-  Future<void> addFlashcard(Flashcard flashcard) async {
-    final current = state.value ?? [];
-    state = AsyncValue.data([...current, flashcard]);
-    await _saveFlashcards();
-  }
+//   Future<void> addFlashcard(Flashcard flashcard) async {
+//     final current = state.value ?? [];
+//     state = AsyncValue.data([...current, flashcard]);
+//     await _saveFlashcards();
+//   }
 
-  Future<void> _saveFlashcards() async {
-    final prefs = await SharedPreferences.getInstance();
-    final current = state.value ?? [];
-    final flashcardsJson = current
-        .map((flashcard) => jsonEncode(flashcard.toMap()))
-        .toList();
-    await prefs.setStringList('offline_flashcards', flashcardsJson);
-  }
+//   Future<void> _saveFlashcards() async {
+//     final prefs = await SharedPreferences.getInstance();
+//     final current = state.value ?? [];
+//     final flashcardsJson = current
+//         .map((flashcard) => jsonEncode(flashcard.toMap()))
+//         .toList();
+//     await prefs.setStringList('offline_flashcards', flashcardsJson);
+//   }
 
-  Future<void> removeFlashcard(String id) async {
-    final current = state.value ?? [];
-    state = AsyncValue.data(current.where((flashcard) => flashcard.id != id).toList());
-    await _saveFlashcards();
-  }
+//   Future<void> removeFlashcard(String id) async {
+//     final current = state.value ?? [];
+//     state = AsyncValue.data(current.where((flashcard) => flashcard.id != id).toList());
+//     await _saveFlashcards();
+//   }
 
-  Future<void> updateCard(Flashcard updatedCard) async {
-    final current = state.value ?? [];
-    state = AsyncValue.data(current.map((card) =>
-      card.id == updatedCard.id ? updatedCard : card
-    ).toList());
-    await _saveFlashcards();
-  }
-}
+//   Future<void> updateCard(Flashcard updatedCard) async {
+//     final current = state.value ?? [];
+//     state = AsyncValue.data(current.map((card) =>
+//       card.id == updatedCard.id ? updatedCard : card
+//     ).toList());
+//     await _saveFlashcards();
+//   }
+// }
 
-final offlineFlashcardsProvider = StateNotifierProvider<OfflineFlashcardsNotifier, AsyncValue<List<Flashcard>>>((ref) {
-  return OfflineFlashcardsNotifier();
-});
+// final offlineFlashcardsProvider = StateNotifierProvider<OfflineFlashcardsNotifier, AsyncValue<List<Flashcard>>>((ref) {
+//   return OfflineFlashcardsNotifier();
+// });
 
-class OfflineLearnScreen extends ConsumerWidget {
-  const OfflineLearnScreen({super.key});
+// class OfflineLearnScreen extends ConsumerWidget {
+//   const OfflineLearnScreen({super.key});
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final flashcardsAsync = ref.watch(offlineFlashcardsProvider);
+//   @override
+//   Widget build(BuildContext context, WidgetRef ref) {
+//     final flashcardsAsync = ref.watch(offlineFlashcardsProvider);
 
-    return flashcardsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, stack) => Center(child: Text('Error loading flashcards')), // Optionally show error
-      data: (flashcards) {
-        if (flashcards.isEmpty) {
-          return const Center(
-            child: Text('No flashcards available offline'),
-          );
-        }
-        return Scaffold(
-          body: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  '${flashcards.length} cards available',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => const OfflineTrainingScreen(),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.play_arrow),
-                  label: const Text('Start Training'),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 16,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
+//     return flashcardsAsync.when(
+//       loading: () => const Center(child: CircularProgressIndicator()),
+//       error: (err, stack) => Center(child: Text('Error loading flashcards')), // Optionally show error
+//       data: (flashcards) {
+//         if (flashcards.isEmpty) {
+//           return const Center(
+//             child: Text('No flashcards available offline'),
+//           );
+//         }
+//         return Scaffold(
+//           body: Center(
+//             child: Column(
+//               mainAxisAlignment: MainAxisAlignment.center,
+//               children: [
+//                 Text(
+//                   '${flashcards.length} cards available',
+//                   style: Theme.of(context).textTheme.titleLarge,
+//                 ),
+//                 const SizedBox(height: 24),
+//                 ElevatedButton.icon(
+//                   onPressed: () {
+//                     Navigator.of(context).push(
+//                       MaterialPageRoute(
+//                         builder: (context) => const OfflineTrainingScreen(),
+//                       ),
+//                     );
+//                   },
+//                   icon: const Icon(Icons.play_arrow),
+//                   label: const Text('Start Training'),
+//                   style: ElevatedButton.styleFrom(
+//                     padding: const EdgeInsets.symmetric(
+//                       horizontal: 32,
+//                       vertical: 16,
+//                     ),
+//                   ),
+//                 ),
+//               ],
+//             ),
+//           ),
+//         );
+//       },
+//     );
+//   }
+// }
 
-class OfflineFlashcardScreen extends HookConsumerWidget {
-  const OfflineFlashcardScreen({super.key});
+// class OfflineFlashcardScreen extends HookConsumerWidget {
+//   const OfflineFlashcardScreen({super.key});
 
-  void _showAddFlashcardDialog(BuildContext context, WidgetRef ref) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return FlashCardBuilder(
-          ref: ref,
-        );
-      },
-    );
-  }
+//   void _showAddFlashcardDialog(BuildContext context, WidgetRef ref) {
+//     showDialog(
+//       context: context,
+//       builder: (context) {
+//         return FlashCardBuilder(
+//           ref: ref,
+//         );
+//       },
+//     );
+//   }
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final flashcardsAsync = ref.watch(offlineFlashcardsProvider);
+//   @override
+//   Widget build(BuildContext context, WidgetRef ref) {
+//     final flashcardsAsync = ref.watch(offlineFlashcardsProvider);
 
-    return flashcardsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, stack) => Center(child: Text('Error loading flashcards')), // Optionally show error
-      data: (flashcards) => Scaffold(
-        body: flashcards.isEmpty
-            ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text(
-                      'No flashcards available',
-                      style: TextStyle(fontSize: 18),
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      onPressed: () => _showAddFlashcardDialog(context, ref),
-                      icon: const Icon(Icons.add),
-                      label: const Text('Add Your First Flashcard'),
-                    ),
-                  ],
-                ),
-              )
-            : ListView.builder(
-                itemCount: flashcards.length,
-                itemBuilder: (context, index) {
-                  final flashcard = flashcards[index];
-                  return Dismissible(
-                    key: Key(flashcard.id), // Convert id to String for Key
-                    background: Container(
-                      color: Colors.red,
-                      alignment: Alignment.centerRight,
-                      padding: const EdgeInsets.only(right: 16),
-                      child: const Icon(Icons.delete, color: Colors.white),
-                    ),
-                    direction: DismissDirection.endToStart,
-                    onDismissed: (direction) {
-                      ref.read(offlineFlashcardsProvider.notifier)
-                          .removeFlashcard(flashcard.id);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Flashcard deleted'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    },
-                    child: Card(
-                      margin: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      child: ListTile(
-                        title: Text(flashcard.word),
-                        subtitle: Text(flashcard.translation),
-                        trailing: Text(
-                          'Last reviewed: ${flashcard.srsLastReviewDate != null ? "Yes" : "No"}',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () => _showAddFlashcardDialog(context, ref),
-          child: const Icon(Icons.add),
-        ),
-      ),
-    );
-  }
-}
+//     return flashcardsAsync.when(
+//       loading: () => const Center(child: CircularProgressIndicator()),
+//       error: (err, stack) => Center(child: Text('Error loading flashcards')), // Optionally show error
+//       data: (flashcards) => Scaffold(
+//         body: flashcards.isEmpty
+//             ? Center(
+//                 child: Column(
+//                   mainAxisAlignment: MainAxisAlignment.center,
+//                   children: [
+//                     const Text(
+//                       'No flashcards available',
+//                       style: TextStyle(fontSize: 18),
+//                     ),
+//                     const SizedBox(height: 16),
+//                     ElevatedButton.icon(
+//                       onPressed: () => _showAddFlashcardDialog(context, ref),
+//                       icon: const Icon(Icons.add),
+//                       label: const Text('Add Your First Flashcard'),
+//                     ),
+//                   ],
+//                 ),
+//               )
+//             : ListView.builder(
+//                 itemCount: flashcards.length,
+//                 itemBuilder: (context, index) {
+//                   final flashcard = flashcards[index];
+//                   return Dismissible(
+//                     key: Key(flashcard.id), // Convert id to String for Key
+//                     background: Container(
+//                       color: Colors.red,
+//                       alignment: Alignment.centerRight,
+//                       padding: const EdgeInsets.only(right: 16),
+//                       child: const Icon(Icons.delete, color: Colors.white),
+//                     ),
+//                     direction: DismissDirection.endToStart,
+//                     onDismissed: (direction) {
+//                       ref.read(offlineFlashcardsProvider.notifier)
+//                           .removeFlashcard(flashcard.id);
+//                       ScaffoldMessenger.of(context).showSnackBar(
+//                         const SnackBar(
+//                           content: Text('Flashcard deleted'),
+//                           backgroundColor: Colors.red,
+//                         ),
+//                       );
+//                     },
+//                     child: Card(
+//                       margin: const EdgeInsets.symmetric(
+//                         horizontal: 16,
+//                         vertical: 8,
+//                       ),
+//                       child: ListTile(
+//                         title: Text(flashcard.word),
+//                         subtitle: Text(flashcard.translation),
+//                         trailing: Text(
+//                           'Last reviewed: ${flashcard.srsLastReviewDate != null ? "Yes" : "No"}',
+//                           style: Theme.of(context).textTheme.bodySmall,
+//                         ),
+//                       ),
+//                     ),
+//                   );
+//                 },
+//               ),
+//         floatingActionButton: FloatingActionButton(
+//           onPressed: () => _showAddFlashcardDialog(context, ref),
+//           child: const Icon(Icons.add),
+//         ),
+//       ),
+//     );
+//   }
+// }

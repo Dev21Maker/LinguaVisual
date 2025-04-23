@@ -27,7 +27,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           child: Column(
             children: [
               Text(
-                'Select ${isNativeLanguage ? "Native" : "Target"} Language',
+                'Select ${isNativeLanguage ? "Native" : " Default Target"} Language',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 16),
@@ -101,7 +101,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           ListTile(
             leading: const Icon(Icons.language),
-            title: const Text('Target Language'),
+            title: const Text('Target Language - Default'),
             subtitle: Text(
               '${settings.targetLanguage.name} (${settings.targetLanguage.nativeName})',
             ),

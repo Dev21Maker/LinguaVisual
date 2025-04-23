@@ -1,13 +1,11 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:lingua_visual/models/flashcard_stack.dart';
-import '../models/flashcard.dart';
+import '../models/online_flashcard.dart';
 
 class FirebaseService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
 
   // Auth methods
   Future<UserCredential> signUp({
@@ -42,7 +40,7 @@ class FirebaseService {
   }
 
   // Database operations (Firestore)
-  Future<List<Flashcard>> getFlashcards() async {
+  Future<List<OnlineFlashcard>> getFlashcards() async {
     if (currentUser == null) return [];
     final snapshot = await _firestore
         .collection('users')
@@ -52,11 +50,11 @@ class FirebaseService {
         .get();
     return snapshot.docs.map((doc) {
       final data = {...doc.data(), 'id': doc.id};
-      return Flashcard.fromMap(data);
+      return OnlineFlashcard.fromMap(data);
     }).toList();
   }
 
-  Future<void> insertCard(Flashcard card) async {
+  Future<void> insertCard(OnlineFlashcard card) async {
     if (currentUser == null) throw Exception('User not authenticated');
     final cardData = card.toMap();
     cardData['created_at'] = FieldValue.serverTimestamp();
@@ -68,7 +66,7 @@ class FirebaseService {
         .add(cardData);
   }
 
-  Future<void> updateCard(Flashcard card) async {
+  Future<void> updateCard(OnlineFlashcard card) async {
     if (currentUser == null) throw Exception('User not authenticated');
     final cardData = card.toMap();
     cardData.remove('id');
@@ -92,7 +90,7 @@ class FirebaseService {
         .delete();
   }
 
-  Future<List<Flashcard>> fetchDueCards() async {
+  Future<List<OnlineFlashcard>> fetchDueCards() async {
     if (currentUser == null) throw Exception('User not authenticated');
     final now = DateTime.now().millisecondsSinceEpoch;
     final snapshot = await _firestore
@@ -104,7 +102,7 @@ class FirebaseService {
         .get();
     return snapshot.docs.map((doc) {
       final data = {...doc.data(), 'id': doc.id};
-      return Flashcard.fromMap(data);
+      return OnlineFlashcard.fromMap(data);
     }).toList();
   }
 

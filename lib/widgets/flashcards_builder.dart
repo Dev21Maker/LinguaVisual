@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:lingua_visual/main.dart';
-import 'package:lingua_visual/models/flashcard.dart';
+import 'package:lingua_visual/models/offline_flashcard.dart';
+import 'package:lingua_visual/models/online_flashcard.dart';
 import 'package:lingua_visual/models/language.dart';
+import 'package:lingua_visual/providers/connectivity_provider.dart';
+import 'package:lingua_visual/providers/offline_flashcard_provider.dart';
 import 'package:lingua_visual/providers/settings_provider.dart';
 import 'package:lingua_visual/providers/flashcard_provider.dart';
 import 'package:uuid/uuid.dart';
@@ -38,21 +40,33 @@ class FlashCardBuilder extends StatelessWidget {
             final translation = parts[1].trim();
             
             if (word.isNotEmpty && translation.isNotEmpty) {
-              final newFlashcard = Flashcard(
-                id: const Uuid().v4(), // Use UUID instead of timestamp
+              final newFlashcard = OfflineFlashcard(
+                id: const Uuid().v4(),
                 word: word,
-                targetLanguage: targetLanguageState.value,
+                targetLanguageCode: targetLanguageState.value.code,
                 translation: translation,
-                nativeLanguage: nativeLanguageState.value,
+                nativeLanguageCode: nativeLanguageState.value.code,
                 srsNextReviewDate: DateTime.now().millisecondsSinceEpoch,
                 srsInterval: 1.0,
                 srsEaseFactor: 2.5,
               );
 
+              // Always save offline first
+              await ref.read(offlineFlashcardsProvider.notifier).addFlashcard(newFlashcard);
+
+              // If online, also save to Firestore
               if (ref.read(isOnlineProvider)) {
-                await ref.read(flashcardStateProvider.notifier).addFlashcard(newFlashcard);
-              } else {
-                await ref.read(offlineFlashcardsProvider.notifier).addFlashcard(newFlashcard);
+                final onlineFlashcard = OnlineFlashcard(
+                  id: newFlashcard.id,
+                  word: newFlashcard.word,
+                  targetLanguage: targetLanguageState.value,
+                  translation: newFlashcard.translation,
+                  nativeLanguage: nativeLanguageState.value,
+                  srsInterval: newFlashcard.srsInterval,
+                  srsEaseFactor: newFlashcard.srsEaseFactor,
+                  srsNextReviewDate: newFlashcard.srsNextReviewDate,
+                );
+                await ref.read(flashcardStateProvider.notifier).addFlashcard(onlineFlashcard);
               }
             }
           }
@@ -234,21 +248,33 @@ class FlashCardBuilder extends StatelessWidget {
                 if (isBulkMode.value) {
                   await _addBulkFlashcards();
                 } else {
-                  final newFlashcard = Flashcard(
-                    id: const Uuid().v4(), // Use UUID instead of timestamp
+                  final newFlashcard = OfflineFlashcard(
+                    id: const Uuid().v4(),
                     word: wordController.text,
-                    targetLanguage: targetLanguageState.value,
+                    targetLanguageCode: targetLanguageState.value.code,
                     translation: translationController.text,
-                    nativeLanguage: nativeLanguageState.value,
+                    nativeLanguageCode: nativeLanguageState.value.code,
                     srsNextReviewDate: DateTime.now().millisecondsSinceEpoch,
                     srsInterval: 1.0,
                     srsEaseFactor: 2.5,
                   );
 
+                  // Always save offline first
+                  await ref.read(offlineFlashcardsProvider.notifier).addFlashcard(newFlashcard);
+
+                  // If online, also save to Firestore
                   if (ref.read(isOnlineProvider)) {
-                    await ref.read(flashcardStateProvider.notifier).addFlashcard(newFlashcard);
-                  } else {
-                    await ref.read(offlineFlashcardsProvider.notifier).addFlashcard(newFlashcard);
+                    final onlineFlashcard = OnlineFlashcard(
+                      id: newFlashcard.id,
+                      word: newFlashcard.word,
+                      targetLanguage: targetLanguageState.value,
+                      translation: newFlashcard.translation,
+                      nativeLanguage: nativeLanguageState.value,
+                      srsInterval: newFlashcard.srsInterval,
+                      srsEaseFactor: newFlashcard.srsEaseFactor,
+                      srsNextReviewDate: newFlashcard.srsNextReviewDate,
+                    );
+                    await ref.read(flashcardStateProvider.notifier).addFlashcard(onlineFlashcard);
                   }
                 }
                 if (context.mounted) {
@@ -266,7 +292,7 @@ class FlashCardBuilder extends StatelessWidget {
                 }
               }
             },
-            child: const Text('ADD'),
+            child: const Text('SAVE'),
           ),
         ],
       );

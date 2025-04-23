@@ -4,7 +4,7 @@ import '../../services/auth_service.dart';
 import 'signup_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/keep_signed_in_service.dart';
-import '../../providers/supabase_provider.dart'; // Exports firebaseServiceProvider
+import '../../providers/firebase_provider.dart'; // Exports firebaseServiceProvider
 
 final authServiceProvider = Provider((ref) => AuthService(ref.watch(firebaseServiceProvider)));
 

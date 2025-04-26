@@ -1,5 +1,5 @@
 import 'package:lingua_visual/models/offline_flashcard.dart';
-import 'package:multi_language_srs/multi_language_srs.dart';
+// import 'package:multi_language_srs/multi_language_srs.dart';
 import 'online_flashcard.dart';
 
 // extension FlashcardToItem on Flashcard {
@@ -45,31 +45,31 @@ import 'online_flashcard.dart';
 //   }
 // }
 
-class FlashcardConverters {
-  static FlashcardItem onlineToFlashcardItem(OnlineFlashcard flashcard) {
-    return FlashcardItem(
-      id: flashcard.id,
-      question: flashcard.word,
-      answer: flashcard.translation,
-      languageId: flashcard.targetLanguage.code,
-      interval: flashcard.srsInterval.toInt(),
-      easeFactor: flashcard.srsEaseFactor,
-      nextReviewDate: DateTime.fromMillisecondsSinceEpoch(flashcard.srsNextReviewDate),
-      reviews: 2, // Increase or decrease by correctness
-    );
-  }
+// class FlashcardConverters {
+//   static FlashcardItem onlineToFlashcardItem(OnlineFlashcard flashcard) {
+//     return FlashcardItem(
+//       id: flashcard.id,
+//       question: flashcard.word,
+//       answer: flashcard.translation,
+//       languageId: flashcard.targetLanguage.code,
+//       interval: flashcard.srsInterval.toInt(),
+//       easeFactor: flashcard.srsEaseFactor,
+//       nextReviewDate: DateTime.fromMillisecondsSinceEpoch(flashcard.srsNextReviewDate),
+//       reviews: 2, // Increase or decrease by correctness
+//     );
+//   }
 
-  static FlashcardItem offlineToFlashcardItem(OfflineFlashcard flashcard) {
-    return FlashcardItem(
-      id: flashcard.id,
-      question: flashcard.word,
-      answer: flashcard.translation,
-      languageId: flashcard.targetLanguageCode,
-      interval: flashcard.srsInterval.toInt(),
-      easeFactor: flashcard.srsEaseFactor,
-      nextReviewDate: DateTime.fromMillisecondsSinceEpoch(flashcard.srsNextReviewDate),
-      reviews: 2, // Increase or decrease by correctness
-    );
-  }
+//   static FlashcardItem offlineToFlashcardItem(OfflineFlashcard flashcard) {
+//     return FlashcardItem(
+//       id: flashcard.id,
+//       question: flashcard.word,
+//       answer: flashcard.translation,
+//       languageId: flashcard.targetLanguageCode,
+//       interval: flashcard.srsInterval.toInt(),
+//       easeFactor: flashcard.srsEaseFactor,
+//       nextReviewDate: DateTime.fromMillisecondsSinceEpoch(flashcard.srsNextReviewDate),
+//       reviews: 2, // Increase or decrease by correctness
+//     );
+//   }
 
-}
+// }

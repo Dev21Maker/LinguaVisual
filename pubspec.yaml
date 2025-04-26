@@ -28,9 +28,9 @@ dependencies:
   flutter_hooks: ^0.21.2
   connectivity_plus: ^6.1.4
   image_picker: ^1.1.2
-  multi_language_srs:
-    git:
-      url: https://github.com/Dev21Maker/MultiSRS.git
+  # multi_language_srs:
+  #   git:
+  #     url: https://github.com/Dev21Maker/MultiSRS.git
   uuid: ^3.0.7
 
 dev_dependencies:

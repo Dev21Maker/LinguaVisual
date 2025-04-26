@@ -52,6 +52,11 @@ class StacksNotifier extends StateNotifier<AsyncValue<List<FlashcardStack>>> {
     }
   }
 
+  FlashcardStack getStackById(String id) {
+    final stacks = state.value ?? [];
+    return stacks.firstWhere((stack) => stack.id == id);
+  }
+
   Future<void> createStack(String name, String description, {String? imageUrl}) async {
     try {
       final newStack = FlashcardStack(

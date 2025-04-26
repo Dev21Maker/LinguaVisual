@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:multi_language_srs/multi_language_srs.dart';
+import 'package:lingua_visual/package/models/flashcard_item.dart';
+// import 'package:multi_language_srs/multi_language_srs.dart';
 
 class FlashcardView extends StatefulWidget {
   final List<FlashcardItem> flashcards;
@@ -54,12 +55,15 @@ class _FlashcardViewState extends State<FlashcardView> {
     return CardSwiper(
       controller: controller,
       cardsCount: widget.flashcards.length,
-      numberOfCardsDisplayed: 1, // We want to display 1 card at a time
+      numberOfCardsDisplayed: 1,
       cardBuilder: (context, index, percentThresholdX, percentThresholdY) {
+        // Add bounds check to prevent index out of range
+        if (index >= widget.flashcards.length) {
+          return const SizedBox.shrink(); // Return empty widget for invalid indices
+        }
         return _buildFlashcard(widget.flashcards[index]);
       },
       onSwipe: (previousIndex, currentIndex, direction) {
-        // Handle swipe if needed
         return true;
       },
       backCardOffset: const Offset(40, 40),

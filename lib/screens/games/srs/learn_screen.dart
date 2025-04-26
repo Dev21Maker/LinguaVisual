@@ -24,6 +24,26 @@ class LearnScreen extends HookConsumerWidget {
     final isSessionComplete = useState(false);
     final srsManager = useMemoized(() => SRSManager(), []);
     final isOnline = ref.watch(isOnlineProvider);
+    final currentImageUrl = useState<String?>(null);
+
+    String? _getImageUrlForCard(String flashcardId) {
+      final isOnline = ref.read(isOnlineProvider);
+      if (isOnline) {
+        final flashcard = ref.read(flashcardStateProvider).value?.firstWhere(
+          (card) => card.id == flashcardId,
+        );
+        return flashcard?.imageUrl;
+      } else {
+        final flashcard = ref.read(offlineFlashcardsProvider).value?.firstWhere(
+          (card) => card.id == flashcardId,
+        );
+        return flashcard?.imageUrl;
+      }
+    }
+
+    void updateCurrentImageUrl(String flashcardId) {
+      currentImageUrl.value = _getImageUrlForCard(flashcardId);
+    }
 
     // Effect to save reviewed cards when leaving screen
     useEffect(() {
@@ -173,6 +193,8 @@ class LearnScreen extends HookConsumerWidget {
         isSessionComplete,
         reviewedCards,
         dueItemsState,
+        updateCurrentImageUrl,
+        currentImageUrl,
       ),
     );
   }
@@ -270,6 +292,8 @@ class LearnScreen extends HookConsumerWidget {
     ValueNotifier<bool> isSessionComplete,
     ValueNotifier<Map<String, (FlashcardItem, String)>> reviewedCards,
     ValueNotifier<List<FlashcardItem>> dueItemsState,
+    void Function(String) updateCurrentImageUrl,
+    ValueNotifier<String?> currentImageUrl,
   ) {
     if (isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -309,11 +333,16 @@ class LearnScreen extends HookConsumerWidget {
       );
     }
 
-    // Your existing flashcard review UI here
+    // Update image URL when due items change
+    if (dueItems.isNotEmpty) {
+      updateCurrentImageUrl(dueItems.first.id);
+    }
+
     return Consumer(
       builder: (context, ref, _) {
         return FlashcardView(
           flashcards: dueItems,
+          imageUrl: currentImageUrl.value,
           onRatingSelected: (rating, flashcard) {
             // Calculate new SRS parameters based on the rating
             double newInterval;
@@ -361,11 +390,19 @@ class LearnScreen extends HookConsumerWidget {
             final newDueItems = dueItemsState.value.where((item) => item.id != flashcard.id).toList();
             dueItemsState.value = newDueItems;
 
+            // Update image URL for next card
+            if (newDueItems.isNotEmpty) {
+              updateCurrentImageUrl(newDueItems.first.id);
+            } else {
+              currentImageUrl.value = null;
+            }
+
             // Check if session is complete
             if (newDueItems.isEmpty) {
               isSessionComplete.value = true;
             }
           },
+          showTranslation: false, // Add this new parameter
         );
       },
     );

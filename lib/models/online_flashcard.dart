@@ -28,6 +28,7 @@ class OnlineFlashcard extends Flashcard {
     this.createdAt,
     this.updatedAt,
     this.stackIds = const [],
+    String description = '', // Added description parameter
   }) : super(
           id: id,
           word: word,
@@ -38,6 +39,7 @@ class OnlineFlashcard extends Flashcard {
           cachedImagePath: cachedImagePath,
           nextReviewDate: DateTime.fromMillisecondsSinceEpoch(srsNextReviewDate),
           reviewLevel: 0, // Add appropriate default or parameter
+          description: description, // Pass description to super
         );
 
   OnlineFlashcard copyWith({
@@ -55,6 +57,7 @@ class OnlineFlashcard extends Flashcard {
     DateTime? createdAt,
     DateTime? updatedAt,
     List<String>? stackIds,
+    String? description, // Added description parameter
   }) {
     return OnlineFlashcard(
       id: id ?? this.id,
@@ -71,6 +74,7 @@ class OnlineFlashcard extends Flashcard {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       stackIds: stackIds ?? this.stackIds,
+      description: description ?? this.description, // Added description to copyWith
     );
   }
 
@@ -91,6 +95,7 @@ class OnlineFlashcard extends Flashcard {
       'created_at': createdAt?.toIso8601String() ?? now.toIso8601String(),
       'updated_at': now.toIso8601String(),
       'stack_ids': stackIds,
+      'description': description, // Added description to map
     };
   }
 
@@ -156,6 +161,7 @@ class OnlineFlashcard extends Flashcard {
       createdAt: parseDateTime(map['created_at']),
       updatedAt: parseDateTime(map['updated_at']),
       stackIds: List<String>.from(map['stack_ids'] ?? []),
+      description: map['description'] as String? ?? '', // Added description from map
     );
   }
 

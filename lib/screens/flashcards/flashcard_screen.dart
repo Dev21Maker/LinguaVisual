@@ -9,6 +9,7 @@ import 'package:lingua_visual/providers/flashcard_provider.dart';
 import 'package:lingua_visual/providers/stack_provider.dart';
 import 'package:lingua_visual/widgets/flashcard_tile.dart';
 import 'package:lingua_visual/widgets/flashcards_builder.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class FlashcardScreen extends HookConsumerWidget {
   const FlashcardScreen({super.key});
@@ -171,6 +172,24 @@ class FlashcardScreen extends HookConsumerWidget {
     final flashcardsAsync = ref.watch(flashcardStateProvider);
     // Track per-card translation visibility
     final translationVisible = useState<Map<String, bool>>({});
+    // Add this state
+    final isReversed = useState<bool>(false);
+
+    // Load the preference when the widget is built
+    useEffect(() {
+      SharedPreferences.getInstance().then((prefs) {
+        isReversed.value = prefs.getBool('flashcards_reversed') ?? false;
+      });
+      return null;
+    }, []);
+
+    // Add this function to save the preference
+    Future<void> toggleOrder() async {
+      final prefs = await SharedPreferences.getInstance();
+      isReversed.value = !isReversed.value;
+      await prefs.setBool('flashcards_reversed', isReversed.value);
+    }
+
     void _changeTranslationVisibility(String id) =>
         translationVisible.value = {
           ...translationVisible.value,
@@ -179,36 +198,83 @@ class FlashcardScreen extends HookConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: stacksAsync.when(
-          data: (stacks) {
-            if (selectedStackId.value == null) {
-              return const Text('All Flashcards');
-            }
-            final selectedStack = stacks.firstWhere(
-              (stack) => stack.id == selectedStackId.value,
-              orElse: () {
-                // If selected stack not found, reset to "All Flashcards"
-                selectedStackId.value = null;
-                return FlashcardStack(
-                  id: '',
-                  name: 'All Flashcards',
-                  description: '',
-                  flashcardIds: [],
-                  createdAt: DateTime.now(),
-                );
+        title: Row(
+          children: [
+            Expanded(
+              child: stacksAsync.when(
+                data: (stacks) {
+                  if (selectedStackId.value == null) {
+                    return const Text('All Flashcards');
+                  }
+                  final selectedStack = stacks.firstWhere(
+                    (stack) => stack.id == selectedStackId.value,
+                    orElse: () {
+                      selectedStackId.value = null;
+                      return FlashcardStack(
+                        id: '',
+                        name: 'All Flashcards',
+                        description: '',
+                        flashcardIds: [],
+                        createdAt: DateTime.now(),
+                      );
+                    },
+                  );
+                  return Text(selectedStack.name);
+                },
+                loading: () => const Text('Loading...'),
+                error: (_, __) => const Text('Flashcards'),
+              ),
+            ),
+            // Add menu button here
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              tooltip: 'Sort options',
+              onSelected: (value) {
+                switch (value) {
+                  case 'toggle_order':
+                    toggleOrder();
+                    break;
+                  case 'refresh':
+                    ref.refresh(flashcardStateProvider);
+                    break;
+                }
               },
-            );
-            return Text(selectedStack.name);
-          },
-          loading: () => const Text('Loading...'),
-          error: (_, __) => const Text('Flashcards'),
+              itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                PopupMenuItem<String>(
+                  value: 'toggle_order',
+                  child: Row(
+                    children: [
+                      Icon(
+                        isReversed.value 
+                            ? Icons.sort_rounded 
+                            : Icons.sort_by_alpha_rounded,
+                        size: 20,
+                        color: Theme.of(context).iconTheme.color,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(isReversed.value ? 'Oldest' : 'Latest'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem<String>(
+                  value: 'refresh',
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.refresh,
+                        size: 20,
+                        color: Theme.of(context).iconTheme.color,
+                      ),
+                      const SizedBox(width: 8),
+                      const Text('Refresh'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => ref.refresh(flashcardStateProvider),
-          ),
-        ],
+        actions: const [], // Remove the original actions
       ),
       drawer: Drawer(
         child: stacksAsync.when(
@@ -322,18 +388,22 @@ class FlashcardScreen extends HookConsumerWidget {
       body: flashcardsAsync.when(
         data: (flashcards) {
           // Filter flashcards based on selected stack
-          final filteredFlashcards =
-              selectedStackId.value != null
-                  ? flashcards.where((card) {
-                    final stack = stacksAsync.value?.firstWhere(
-                      (s) => s.id == selectedStackId.value,
-                      orElse: () => stacksAsync.value!.last,
-                    );
-                    return stack?.flashcardIds.contains(card.id) ?? false;
-                  }).toList()
-                  : flashcards;
+          final filteredFlashcards = selectedStackId.value != null
+              ? flashcards.where((card) {
+                  final stack = stacksAsync.value?.firstWhere(
+                    (s) => s.id == selectedStackId.value,
+                    orElse: () => stacksAsync.value!.last,
+                  );
+                  return stack?.flashcardIds.contains(card.id) ?? false;
+                }).toList()
+              : flashcards;
 
-          if (filteredFlashcards.isEmpty) {
+          // Apply the reverse order if needed
+          final displayedFlashcards = isReversed.value 
+              ? filteredFlashcards.reversed.toList()
+              : filteredFlashcards;
+
+          if (displayedFlashcards.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -360,24 +430,30 @@ class FlashcardScreen extends HookConsumerWidget {
           }
 
           return ListView.builder(
-            itemCount: filteredFlashcards.length,
+            itemCount: displayedFlashcards.length,
             itemBuilder: (context, index) {
-              final card = filteredFlashcards[index];
+              final card = displayedFlashcards[index];
               return FlashcardTile(
-                card: card, 
-                translationVisible: translationVisible, 
-                changeTranslationVisibility: (p0) => _changeTranslationVisibility(p0), 
-                showMoveToStackDialog: () =>  _showMoveToStackDialog(
-                            context,
-                            ref,
-                            card,
-                            selectedStackId.value,
-                          ),
+                card: card,
+                translationVisible: translationVisible,
+                changeTranslationVisibility: (p0) => 
+                    _changeTranslationVisibility(p0),
+                showMoveToStackDialog: () => _showMoveToStackDialog(
+                  context,
+                  ref,
+                  card,
+                  selectedStackId.value,
+                ),
                 getEmoji: () {
-                  if(ref.read(isOnlineProvider.notifier).state) {
+                  if (ref.read(isOnlineProvider.notifier).state) {
                     return card.targetLanguage.emoji;
                   } else {
-                    return supportedLanguages.firstWhere((element) => element.code == card.targetLanguageCode,).emoji;
+                    return supportedLanguages
+                        .firstWhere(
+                          (element) => 
+                              element.code == card.targetLanguageCode,
+                        )
+                        .emoji;
                   }
                 },
               );

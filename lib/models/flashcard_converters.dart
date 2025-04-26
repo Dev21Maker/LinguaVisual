@@ -1,8 +1,10 @@
+import 'package:lingua_visual/models/flashcard.dart' show Flashcard;
 import 'package:lingua_visual/models/offline_flashcard.dart';
+import 'package:lingua_visual/package/models/flashcard_item.dart';
 // import 'package:multi_language_srs/multi_language_srs.dart';
 import 'online_flashcard.dart';
 
-// extension FlashcardToItem on Flashcard {
+extension FlashcardToItem on Flashcard {
 //   FlashcardItem toFlashcardItem() {
 //     return FlashcardItem(
 //       id: id,
@@ -43,9 +45,9 @@ import 'online_flashcard.dart';
 //       reviews: 2, //TODO Increase or decrese by corectness
 //     );
 //   }
-// }
+}
 
-// class FlashcardConverters {
+class FlashcardConverters {
 //   static FlashcardItem onlineToFlashcardItem(OnlineFlashcard flashcard) {
 //     return FlashcardItem(
 //       id: flashcard.id,
@@ -59,17 +61,17 @@ import 'online_flashcard.dart';
 //     );
 //   }
 
-//   static FlashcardItem offlineToFlashcardItem(OfflineFlashcard flashcard) {
-//     return FlashcardItem(
-//       id: flashcard.id,
-//       question: flashcard.word,
-//       answer: flashcard.translation,
-//       languageId: flashcard.targetLanguageCode,
-//       interval: flashcard.srsInterval.toInt(),
-//       easeFactor: flashcard.srsEaseFactor,
-//       nextReviewDate: DateTime.fromMillisecondsSinceEpoch(flashcard.srsNextReviewDate),
-//       reviews: 2, // Increase or decrease by correctness
-//     );
-//   }
+  static FlashcardItem offlineToFlashcardItem(OfflineFlashcard flashcard) {
+    return FlashcardItem(
+      id: flashcard.id,
+      question: flashcard.word,
+      answer: flashcard.translation,
+      languageId: flashcard.targetLanguageCode,
+      interval: flashcard.srsInterval.toInt(),
+      personalDifficultyFactor: flashcard.srsEaseFactor,
+      nextReviewDate: DateTime.fromMillisecondsSinceEpoch(flashcard.srsNextReviewDate),
+      reviews: 2, // Increase or decrease by correctness
+    );
+  }
 
-// }
+}

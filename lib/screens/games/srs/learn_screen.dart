@@ -56,47 +56,55 @@ class LearnScreen extends HookConsumerWidget {
     }
 
     useEffect(() {
+      // Store ref in a local variable to avoid closure issues
+      final currentRef = ref;
+      
       return () async {
         if (reviewedCards.value.isNotEmpty) {
-          final isOnline = ref.read(isOnlineProvider);
-          
-          for (final entry in reviewedCards.value.entries) {
-            final (flashcardItem, rating) = entry.value;
-            try {
-              if (isOnline) {
-                final flashcardsData = ref.read(flashcardStateProvider).value;
-                if (flashcardsData == null || flashcardsData.isEmpty) continue;
-                
-                final cardToUpdate = flashcardsData.firstWhere(
-                  (card) => card.id == flashcardItem.id,
-                  orElse: () => flashcardsData.first,
-                );
-                
-                final updatedCard = cardToUpdate.copyWith(
-                  srsInterval: flashcardItem.interval.toDouble(),
-                  srsEaseFactor: flashcardItem.personalDifficultyFactor,
-                  srsNextReviewDate: flashcardItem.nextReviewDate.millisecondsSinceEpoch,
-                );
-                await ref.read(flashcardStateProvider.notifier).updateFlashcard(updatedCard);
-              } else {
-                final flashcardsData = ref.read(offlineFlashcardsProvider).value;
-                if (flashcardsData == null || flashcardsData.isEmpty) continue;
-                
-                final cardToUpdate = flashcardsData.firstWhere(
-                  (card) => card.id == flashcardItem.id,
-                  orElse: () => flashcardsData.first,
-                );
-                
-                final updatedCard = cardToUpdate.copyWith(
-                  srsInterval: flashcardItem.interval.toDouble(),
-                  srsEaseFactor: flashcardItem.personalDifficultyFactor,
-                  srsNextReviewDate: flashcardItem.nextReviewDate.millisecondsSinceEpoch,
-                );
-                await ref.read(offlineFlashcardsProvider.notifier).updateCard(updatedCard);
+          // Check if we can still access the ref (widget not disposed)
+          try {
+            final isOnline = currentRef.read(isOnlineProvider);
+            
+            for (final entry in reviewedCards.value.entries) {
+              final (flashcardItem, rating) = entry.value;
+              try {
+                if (isOnline) {
+                  final flashcardsData = currentRef.read(flashcardStateProvider).value;
+                  if (flashcardsData == null || flashcardsData.isEmpty) continue;
+                  
+                  final cardToUpdate = flashcardsData.firstWhere(
+                    (card) => card.id == flashcardItem.id,
+                    orElse: () => flashcardsData.first,
+                  );
+                  
+                  final updatedCard = cardToUpdate.copyWith(
+                    srsInterval: flashcardItem.interval.toDouble(),
+                    srsEaseFactor: flashcardItem.personalDifficultyFactor,
+                    srsNextReviewDate: flashcardItem.nextReviewDate.millisecondsSinceEpoch,
+                  );
+                  await currentRef.read(flashcardStateProvider.notifier).updateFlashcard(updatedCard);
+                } else {
+                  final flashcardsData = currentRef.read(offlineFlashcardsProvider).value;
+                  if (flashcardsData == null || flashcardsData.isEmpty) continue;
+                  
+                  final cardToUpdate = flashcardsData.firstWhere(
+                    (card) => card.id == flashcardItem.id,
+                    orElse: () => flashcardsData.first,
+                  );
+                  
+                  final updatedCard = cardToUpdate.copyWith(
+                    srsInterval: flashcardItem.interval.toDouble(),
+                    srsEaseFactor: flashcardItem.personalDifficultyFactor,
+                    srsNextReviewDate: flashcardItem.nextReviewDate.millisecondsSinceEpoch,
+                  );
+                  await currentRef.read(offlineFlashcardsProvider.notifier).updateCard(updatedCard);
+                }
+              } catch (e) {
+                debugPrint('Failed to save reviewed card: $e');
               }
-            } catch (e) {
-              print('Failed to save reviewed card: $e');
             }
+          } catch (e) {
+            debugPrint('Widget disposed, cannot save reviewed cards: $e');
           }
         }
       };
@@ -171,6 +179,218 @@ class LearnScreen extends HookConsumerWidget {
       return null;
     }, [selectedStackId.value]);
 
+    void _showStackSelector(
+      BuildContext context,
+      WidgetRef ref,
+      ValueNotifier<String?> selectedStackId,
+      VoidCallback onStackSelected,
+    ) {
+      final stacksAsync = ref.watch(stacksProvider);
+      
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Select Stack'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: stacksAsync.when(
+              data: (stacks) {
+                return ListView(
+                  shrinkWrap: true,
+                  children: [
+                    // Add "All Cards" option
+                    ListTile(
+                      title: const Text('All Cards'),
+                      selected: selectedStackId.value == null,
+                      onTap: () {
+                        selectedStackId.value = null;
+                        onStackSelected();
+                        Navigator.pop(context);
+                      },
+                    ),
+                    // Add divider
+                    const Divider(),
+                    // List all stacks
+                    ...stacks.map((stack) {
+                      final flashcardsAsync = ref.watch(flashcardStateProvider);
+                      final dueCount = flashcardsAsync.whenOrNull(
+                        data: (flashcards) => flashcards
+                            .where((card) => stack.flashcardIds.contains(card.id))
+                            .length,
+                      ) ?? 0;
+
+                      return ListTile(
+                        title: Text(stack.name),
+                        subtitle: Text('$dueCount cards'),
+                        selected: selectedStackId.value == stack.id,
+                        onTap: () {
+                          selectedStackId.value = stack.id;
+                          onStackSelected();
+                          Navigator.pop(context);
+                        },
+                      );
+                    }).toList(),
+                  ],
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (error, _) => Text('Error: $error'),
+            ),
+          ),
+        ),
+      );
+    }
+
+    Widget _buildBody(
+      BuildContext context,
+      bool isLoading,
+      String? error,
+      List<FlashcardItem> dueItems,
+      bool showEmpty,
+      ValueNotifier<String?> selectedStackId,
+      VoidCallback loadDueCards,
+      ValueNotifier<bool> isSessionComplete,
+      ValueNotifier<Map<String, (FlashcardItem, String)>> reviewedCards,
+      ValueNotifier<List<FlashcardItem>> dueItemsState,
+      void Function(String) updateCurrentImageUrl,
+      ValueNotifier<String?> currentImageUrl,
+      srs_package.SRSManager srsManager,
+    ) {
+      if (isLoading) {
+        return const Center(child: CircularProgressIndicator());
+      }
+
+      if (error != null) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 64, color: Colors.red),
+              const SizedBox(height: 16),
+              Text('Error: $error'),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: loadDueCards,
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        );
+      }
+
+      if (dueItems.isEmpty) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.check_circle_outline, size: 64, color: Colors.green),
+              const SizedBox(height: 16),
+              Text(
+                showEmpty ? 'No cards due for review!' : 'Loading cards...',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            ],
+          ),
+        );
+      }
+
+      if (dueItems.isNotEmpty) {
+        updateCurrentImageUrl(dueItems.first.id);
+      }
+
+      return FlashcardView(
+        flashcards: dueItems,
+        imageUrl: currentImageUrl.value,
+        onRatingSelected: (rating, flashcard) async {
+          srs_model.ReviewOutcome outcome;
+          switch (rating.toLowerCase()) {
+            case 'again':
+              outcome = srs_model.ReviewOutcome.missed;
+              break;
+            case 'hard':
+            case 'good': 
+              outcome = srs_model.ReviewOutcome.gotIt;
+              break;
+            case 'easy':
+              outcome = srs_model.ReviewOutcome.quick;
+              break;
+            default:
+              outcome = srs_model.ReviewOutcome.gotIt;
+          }
+          
+          final reviewType = srs_model.ReviewType.typing;
+          
+          // Record the review in the SRS manager
+          final updatedItem = srsManager.recordReview(
+            flashcard.id, 
+            outcome, 
+            reviewType
+          );
+          
+          if (updatedItem != null) {
+            // Update the local state for UI
+            final newReviewedCards = {...reviewedCards.value};
+            newReviewedCards[flashcard.id] = (updatedItem, rating);
+            reviewedCards.value = newReviewedCards;
+            
+            // Update the database immediately (online or offline)
+            final isOnline = ref.read(isOnlineProvider);
+            try {
+              if (isOnline) {
+                final flashcardsData = ref.read(flashcardStateProvider).value;
+                if (flashcardsData != null && flashcardsData.isNotEmpty) {
+                  final cardToUpdate = flashcardsData.firstWhere(
+                    (card) => card.id == flashcard.id,
+                    orElse: () => flashcardsData.first,
+                  );
+                  
+                  final updatedCard = cardToUpdate.copyWith(
+                    srsInterval: updatedItem.interval.toDouble(),
+                    srsEaseFactor: updatedItem.personalDifficultyFactor,
+                    srsNextReviewDate: updatedItem.nextReviewDate.millisecondsSinceEpoch,
+                  );
+                  await ref.read(flashcardStateProvider.notifier).updateFlashcard(updatedCard);
+                }
+              } else {
+                final flashcardsData = ref.read(offlineFlashcardsProvider).value;
+                if (flashcardsData != null && flashcardsData.isNotEmpty) {
+                  final cardToUpdate = flashcardsData.firstWhere(
+                    (card) => card.id == flashcard.id,
+                    orElse: () => flashcardsData.first,
+                  );
+                  
+                  final updatedCard = cardToUpdate.copyWith(
+                    srsInterval: updatedItem.interval.toDouble(),
+                    srsEaseFactor: updatedItem.personalDifficultyFactor,
+                    srsNextReviewDate: updatedItem.nextReviewDate.millisecondsSinceEpoch,
+                  );
+                  await ref.read(offlineFlashcardsProvider.notifier).updateCard(updatedCard);
+                }
+              }
+            } catch (e) {
+              print('Failed to update card in database: $e');
+              // Show a snackbar or toast message if you want to notify the user
+            }
+            
+            // Update the UI with the remaining cards
+            final newDueItems = dueItemsState.value.where((item) => item.id != flashcard.id).toList();
+            dueItemsState.value = newDueItems;
+            
+            if (newDueItems.isNotEmpty) {
+              updateCurrentImageUrl(newDueItems.first.id);
+            } else {
+              currentImageUrl.value = null;
+            }
+            
+            if (newDueItems.isEmpty) {
+              isSessionComplete.value = true;
+            }
+          }
+        },
+        showTranslation: false,
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Review Cards'),
@@ -203,176 +423,6 @@ class LearnScreen extends HookConsumerWidget {
         currentImageUrl,
         srsManager,
       ),
-    );
-  }
-
-  void _showStackSelector(
-    BuildContext context,
-    WidgetRef ref,
-    ValueNotifier<String?> selectedStackId,
-    VoidCallback onStackSelected,
-  ) {
-    final stacksAsync = ref.watch(stacksProvider);
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Select Stack'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: stacksAsync.when(
-            data: (stacks) {
-              return ListView(
-                shrinkWrap: true,
-                children: [
-                  // Add "All Cards" option
-                  ListTile(
-                    title: const Text('All Cards'),
-                    selected: selectedStackId.value == null,
-                    onTap: () {
-                      selectedStackId.value = null;
-                      onStackSelected();
-                      Navigator.pop(context);
-                    },
-                  ),
-                  // Add divider
-                  const Divider(),
-                  // List all stacks
-                  ...stacks.map((stack) {
-                    final flashcardsAsync = ref.watch(flashcardStateProvider);
-                    final dueCount = flashcardsAsync.whenOrNull(
-                      data: (flashcards) => flashcards
-                          .where((card) => stack.flashcardIds.contains(card.id))
-                          .length,
-                    ) ?? 0;
-
-                    return ListTile(
-                      title: Text(stack.name),
-                      subtitle: Text('$dueCount cards'),
-                      selected: selectedStackId.value == stack.id,
-                      onTap: () {
-                        selectedStackId.value = stack.id;
-                        onStackSelected();
-                        Navigator.pop(context);
-                      },
-                    );
-                  }).toList(),
-                ],
-              );
-            },
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, _) => Text('Error: $error'),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBody(
-    BuildContext context,
-    bool isLoading,
-    String? error,
-    List<FlashcardItem> dueItems,
-    bool showEmpty,
-    ValueNotifier<String?> selectedStackId,
-    VoidCallback loadDueCards,
-    ValueNotifier<bool> isSessionComplete,
-    ValueNotifier<Map<String, (FlashcardItem, String)>> reviewedCards,
-    ValueNotifier<List<FlashcardItem>> dueItemsState,
-    void Function(String) updateCurrentImageUrl,
-    ValueNotifier<String?> currentImageUrl,
-    srs_package.SRSManager srsManager,
-  ) {
-    if (isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (error != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, size: 64, color: Colors.red),
-            const SizedBox(height: 16),
-            Text('Error: $error'),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: loadDueCards,
-              child: const Text('Retry'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (dueItems.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.check_circle_outline, size: 64, color: Colors.green),
-            const SizedBox(height: 16),
-            Text(
-              showEmpty ? 'No cards due for review!' : 'Loading cards...',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (dueItems.isNotEmpty) {
-      updateCurrentImageUrl(dueItems.first.id);
-    }
-
-    return FlashcardView(
-      flashcards: dueItems,
-      imageUrl: currentImageUrl.value,
-      onRatingSelected: (rating, flashcard) {
-        srs_model.ReviewOutcome outcome;
-        switch (rating.toLowerCase()) {
-          case 'again':
-            outcome = srs_model.ReviewOutcome.missed;
-            break;
-          case 'hard':
-          case 'good': 
-            outcome = srs_model.ReviewOutcome.gotIt;
-            break;
-          case 'easy':
-            outcome = srs_model.ReviewOutcome.quick;
-            break;
-          default:
-            outcome = srs_model.ReviewOutcome.gotIt;
-        }
-        
-        final reviewType = srs_model.ReviewType.typing;
-        
-        final updatedItem = srsManager.recordReview(
-          flashcard.id, 
-          outcome, 
-          reviewType
-        );
-        
-        if (updatedItem != null) {
-          final newReviewedCards = {...reviewedCards.value};
-          newReviewedCards[flashcard.id] = (updatedItem, rating);
-          reviewedCards.value = newReviewedCards;
-          
-          final newDueItems = dueItemsState.value.where((item) => item.id != flashcard.id).toList();
-          dueItemsState.value = newDueItems;
-          
-          if (newDueItems.isNotEmpty) {
-            updateCurrentImageUrl(newDueItems.first.id);
-          } else {
-            currentImageUrl.value = null;
-          }
-          
-          if (newDueItems.isEmpty) {
-            isSessionComplete.value = true;
-          }
-        }
-      },
-      showTranslation: false,
     );
   }
 }

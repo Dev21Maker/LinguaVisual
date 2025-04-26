@@ -10,6 +10,7 @@ abstract class Flashcard {
   final int reviewLevel;
   final double interval;
   final double easeFactor;
+  final String description;
 
   Flashcard({
     required this.id,
@@ -23,5 +24,6 @@ abstract class Flashcard {
     required this.reviewLevel,
     this.interval = 1.0,
     this.easeFactor = 1.0,
+    this.description = '',
   });
 }

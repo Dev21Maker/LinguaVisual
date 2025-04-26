@@ -18,9 +18,11 @@ class OfflineFlashcard extends Flashcard {
     this.srsEaseFactor = 2.5,
     required this.srsNextReviewDate,
     this.srsLastReviewDate,
+    String description = '', // Added description parameter
   }) : super(
           nextReviewDate: DateTime.fromMillisecondsSinceEpoch(srsNextReviewDate),
           reviewLevel: 0,
+          description: description, // Pass description to super
         );
 
   factory OfflineFlashcard.fromMap(Map<String, dynamic> map) {
@@ -36,6 +38,7 @@ class OfflineFlashcard extends Flashcard {
       srsEaseFactor: (map['srs_ease_factor'] as num?)?.toDouble() ?? 2.5,
       srsNextReviewDate: map['srs_next_review_date'] as int? ?? DateTime.now().millisecondsSinceEpoch,
       srsLastReviewDate: map['srs_last_review_date'] as int?,
+      description: map['description'] as String? ?? '', // Added description from map
     );
   }
 
@@ -52,6 +55,7 @@ class OfflineFlashcard extends Flashcard {
       'srs_ease_factor': srsEaseFactor,
       'srs_next_review_date': srsNextReviewDate,
       'srs_last_review_date': srsLastReviewDate,
+      'description': description, // Added description to map
     };
   }
 
@@ -69,6 +73,7 @@ class OfflineFlashcard extends Flashcard {
     int? srsLastReviewDate,
     DateTime? createdAt,
     DateTime? updatedAt,
+    String? description, // Added description parameter
   }) {
     return OfflineFlashcard(
       id: id ?? this.id,
@@ -82,6 +87,7 @@ class OfflineFlashcard extends Flashcard {
       srsEaseFactor: srsEaseFactor ?? this.srsEaseFactor,
       srsNextReviewDate: srsNextReviewDate ?? this.srsNextReviewDate,
       srsLastReviewDate: srsLastReviewDate ?? this.srsLastReviewDate,
+      description: description ?? this.description, // Added description to copyWith
     );
   }
 }

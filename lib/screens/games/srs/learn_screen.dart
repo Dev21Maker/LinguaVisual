@@ -1,54 +1,42 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:lingua_visual/models/flashcard.dart' show Flashcard;
+import 'package:lingua_visual/models/flashcard.dart';
 import 'package:lingua_visual/providers/flashcard_provider.dart';
 import 'package:lingua_visual/providers/offline_flashcard_provider.dart';
-import 'package:lingua_visual/providers/connectivity_provider.dart';
-import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:lingua_visual/providers/stack_provider.dart';
-import 'package:lingua_visual/package/models/flashcard_item.dart' show FlashcardItem;
-import 'package:lingua_visual/package/models/review_outcome.dart' as srs_model;
-import 'package:lingua_visual/package/srs_manager.dart' as srs_package ;
 import 'package:lingua_visual/widgets/flashcard_view.dart';
+// import 'package:lingua_visual/widgets/loading_indicator.dart';
+import 'package:lingua_visual/package/srs_manager.dart' as srs_package;
+import 'package:lingua_visual/package/models/flashcard_item.dart' as srs_model;
+import 'package:lingua_visual/package/models/review_outcome.dart' as srs_outcome;
+import 'package:collection/collection.dart';
 
 class LearnScreen extends HookConsumerWidget {
   const LearnScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final dueItemsState = useState<List<FlashcardItem>>([]);
-    final reviewedCards = useState<Map<String, (FlashcardItem, String)>>({});
+    final dueItemsState = useState<List<srs_model.FlashcardItem>>([]);
+    final reviewedCards = useState<Map<String, (srs_model.FlashcardItem, String)>>({});
     final isLoadingState = useState(true);
     final errorState = useState<String?>(null);
     final showEmptyState = useState(false);
     final selectedStackId = useState<String?>(null);
     final isSessionComplete = useState(false);
     final srsManager = useMemoized(() => srs_package.SRSManager(), []);
-    final isOnline = ref.watch(isOnlineProvider);
     final currentImageUrl = useState<String?>(null);
 
     String? _getImageUrlForCard(String flashcardId) {
-      final isOnline = ref.read(isOnlineProvider);
-      if (isOnline) {
-        final flashcardsData = ref.read(flashcardStateProvider).value;
-        if (flashcardsData == null || flashcardsData.isEmpty) return null;
-        
-        final flashcard = flashcardsData.firstWhere(
-          (card) => card.id == flashcardId,
-          orElse: () => flashcardsData.first,
-        );
-        return flashcard.imageUrl;
-      } else {
-        final flashcardsData = ref.read(offlineFlashcardsProvider).value;
-        if (flashcardsData == null || flashcardsData.isEmpty) return null;
-        
-        final flashcard = flashcardsData.firstWhere(
-          (card) => card.id == flashcardId,
-          orElse: () => flashcardsData.first,
-        );
-        return flashcard.imageUrl;
-      }
+      final flashcardsData = ref.read(flashcardStateProvider).value;
+      if (flashcardsData == null || flashcardsData.isEmpty) return null;
+      
+      final flashcard = flashcardsData.firstWhere(
+        (card) => card.id == flashcardId,
+        orElse: () => flashcardsData.first,
+      );
+      return flashcard.imageUrl;
     }
 
     void updateCurrentImageUrl(String flashcardId) {
@@ -56,49 +44,28 @@ class LearnScreen extends HookConsumerWidget {
     }
 
     useEffect(() {
-      // Store ref in a local variable to avoid closure issues
       final currentRef = ref;
       
       return () async {
         if (reviewedCards.value.isNotEmpty) {
-          // Check if we can still access the ref (widget not disposed)
           try {
-            final isOnline = currentRef.read(isOnlineProvider);
-            
             for (final entry in reviewedCards.value.entries) {
               final (flashcardItem, rating) = entry.value;
               try {
-                if (isOnline) {
-                  final flashcardsData = currentRef.read(flashcardStateProvider).value;
-                  if (flashcardsData == null || flashcardsData.isEmpty) continue;
+                final flashcardsData = currentRef.read(flashcardStateProvider).value;
+                if (flashcardsData == null || flashcardsData.isEmpty) continue;
                   
-                  final cardToUpdate = flashcardsData.firstWhere(
-                    (card) => card.id == flashcardItem.id,
-                    orElse: () => flashcardsData.first,
-                  );
+                final cardToUpdate = flashcardsData.firstWhere(
+                  (card) => card.id == flashcardItem.id,
+                  orElse: () => flashcardsData.first,
+                );
                   
-                  final updatedCard = cardToUpdate.copyWith(
-                    srsInterval: flashcardItem.interval.toDouble(),
-                    srsEaseFactor: flashcardItem.personalDifficultyFactor,
-                    srsNextReviewDate: flashcardItem.nextReviewDate.millisecondsSinceEpoch,
-                  );
-                  await currentRef.read(flashcardStateProvider.notifier).updateFlashcard(updatedCard);
-                } else {
-                  final flashcardsData = currentRef.read(offlineFlashcardsProvider).value;
-                  if (flashcardsData == null || flashcardsData.isEmpty) continue;
-                  
-                  final cardToUpdate = flashcardsData.firstWhere(
-                    (card) => card.id == flashcardItem.id,
-                    orElse: () => flashcardsData.first,
-                  );
-                  
-                  final updatedCard = cardToUpdate.copyWith(
-                    srsInterval: flashcardItem.interval.toDouble(),
-                    srsEaseFactor: flashcardItem.personalDifficultyFactor,
-                    srsNextReviewDate: flashcardItem.nextReviewDate.millisecondsSinceEpoch,
-                  );
-                  await currentRef.read(offlineFlashcardsProvider.notifier).updateCard(updatedCard);
-                }
+                final updatedCard = cardToUpdate.copyWith(
+                  srsInterval: flashcardItem.interval.toDouble(),
+                  srsEaseFactor: flashcardItem.personalDifficultyFactor,
+                  srsNextReviewDate: flashcardItem.nextReviewDate.millisecondsSinceEpoch,
+                );
+                await currentRef.read(flashcardStateProvider.notifier).updateFlashcard(updatedCard);
               } catch (e) {
                 debugPrint('Failed to save reviewed card: $e');
               }
@@ -123,9 +90,7 @@ class LearnScreen extends HookConsumerWidget {
       });
 
       try {
-        final flashcardsAsync = isOnline 
-            ? ref.read(flashcardStateProvider) 
-            : ref.read(offlineFlashcardsProvider);
+        final flashcardsAsync = ref.read(flashcardStateProvider);
         
         await flashcardsAsync.whenData((flashcards) async {
           srsManager.clear();
@@ -135,7 +100,6 @@ class LearnScreen extends HookConsumerWidget {
             return;
           }
           
-          // Only filter by stack if a stack is selected
           final filteredFlashcards = selectedStackId.value != null 
               ? flashcards.where((card) {
                   final stack = ref.read(stacksProvider.notifier).getStackById(selectedStackId.value!);
@@ -143,18 +107,27 @@ class LearnScreen extends HookConsumerWidget {
                 }).toList()
               : flashcards;
           
+          final items = <srs_model.FlashcardItem>[]; 
           for (final Flashcard card in filteredFlashcards) {
-            final srsItem = FlashcardItem(
+            final item = srs_model.FlashcardItem(
               id: card.id,
               languageId: card.targetLanguageCode,
               question: card.word,
               answer: card.translation,
-              interval: card.interval.toInt(),
-              personalDifficultyFactor: card.easeFactor,
-              nextReviewDate: card.nextReviewDate,
+              interval: card.srsInterval.toInt(),
+              personalDifficultyFactor: card.srsEaseFactor,
+              nextReviewDate: DateTime.fromMillisecondsSinceEpoch(card.srsNextReviewDate),
+              lastReviewDate: card.srsLastReviewDate != null ? DateTime.fromMillisecondsSinceEpoch(card.srsLastReviewDate!) : null,
+              baseIntervalIndex: card.srsBaseIntervalIndex,
+              quickStreak: card.srsQuickStreak,
+              isPriority: card.srsIsPriority,
+              isInLearningPhase: card.srsIsInLearningPhase,
             );
-            
-            srsManager.addItem(srsItem);
+            items.add(item);
+          }
+          
+          for (final item in items) {
+            srsManager.addItem(item);
           }
           
           final dueItems = srsManager.getDueItems(DateTime.now());
@@ -198,7 +171,6 @@ class LearnScreen extends HookConsumerWidget {
                 return ListView(
                   shrinkWrap: true,
                   children: [
-                    // Add "All Cards" option
                     ListTile(
                       title: const Text('All Cards'),
                       selected: selectedStackId.value == null,
@@ -208,9 +180,7 @@ class LearnScreen extends HookConsumerWidget {
                         Navigator.pop(context);
                       },
                     ),
-                    // Add divider
                     const Divider(),
-                    // List all stacks
                     ...stacks.map((stack) {
                       final flashcardsAsync = ref.watch(flashcardStateProvider);
                       final dueCount = flashcardsAsync.whenOrNull(
@@ -245,16 +215,17 @@ class LearnScreen extends HookConsumerWidget {
       BuildContext context,
       bool isLoading,
       String? error,
-      List<FlashcardItem> dueItems,
+      List<srs_model.FlashcardItem> dueItems,
       bool showEmpty,
       ValueNotifier<String?> selectedStackId,
       VoidCallback loadDueCards,
       ValueNotifier<bool> isSessionComplete,
-      ValueNotifier<Map<String, (FlashcardItem, String)>> reviewedCards,
-      ValueNotifier<List<FlashcardItem>> dueItemsState,
+      ValueNotifier<Map<String, (srs_model.FlashcardItem, String)>> reviewedCards,
+      ValueNotifier<List<srs_model.FlashcardItem>> dueItemsState,
       void Function(String) updateCurrentImageUrl,
       ValueNotifier<String?> currentImageUrl,
       srs_package.SRSManager srsManager,
+      WidgetRef ref,
     ) {
       if (isLoading) {
         return const Center(child: CircularProgressIndicator());
@@ -302,25 +273,24 @@ class LearnScreen extends HookConsumerWidget {
         flashcards: dueItems,
         imageUrl: currentImageUrl.value,
         onRatingSelected: (rating, flashcard) async {
-          srs_model.ReviewOutcome outcome;
-          switch (rating.toLowerCase()) {
-            case 'again':
-              outcome = srs_model.ReviewOutcome.missed;
+          srs_outcome.ReviewOutcome outcome;
+          switch (rating) {
+            case 'Missed':
+              outcome = srs_outcome.ReviewOutcome.hard;
               break;
-            case 'hard':
-            case 'good': 
-              outcome = srs_model.ReviewOutcome.gotIt;
+            case 'Got It':
+              outcome = srs_outcome.ReviewOutcome.good;
               break;
-            case 'easy':
-              outcome = srs_model.ReviewOutcome.quick;
+            case 'Quick':
+              outcome = srs_outcome.ReviewOutcome.easy;
               break;
             default:
-              outcome = srs_model.ReviewOutcome.gotIt;
+              print('Unknown rating: $rating, defaulting to missed'); // Log unexpected ratings
+              outcome = srs_outcome.ReviewOutcome.good;
           }
           
-          final reviewType = srs_model.ReviewType.typing;
+          final reviewType = srs_outcome.ReviewType.typing; // Changed to valid value 'typing'
           
-          // Record the review in the SRS manager
           final updatedItem = srsManager.recordReview(
             flashcard.id, 
             outcome, 
@@ -328,61 +298,57 @@ class LearnScreen extends HookConsumerWidget {
           );
           
           if (updatedItem != null) {
-            // Update the local state for UI
+            final onlineFlashcardsState = ref.read(flashcardStateProvider);
+            if (onlineFlashcardsState.hasValue) {
+              final cardToUpdate = onlineFlashcardsState.value!.firstWhereOrNull(
+                (card) => card.id == flashcard.id,
+              );
+              
+              if (cardToUpdate != null) {
+                final updatedCard = cardToUpdate.copyWith(
+                  srsInterval: updatedItem.interval.toDouble(), // Keep?
+                  srsEaseFactor: updatedItem.personalDifficultyFactor, // Map PDF to EaseFactor
+                  srsNextReviewDate: updatedItem.nextReviewDate.millisecondsSinceEpoch,
+                  srsLastReviewDate: updatedItem.lastReviewDate?.millisecondsSinceEpoch, // Added
+                  srsBaseIntervalIndex: updatedItem.baseIntervalIndex, // Added
+                  srsQuickStreak: updatedItem.quickStreak, // Added
+                  srsIsPriority: updatedItem.isPriority, // Added
+                  srsIsInLearningPhase: updatedItem.isInLearningPhase, // Added
+                );
+                await ref.read(flashcardStateProvider.notifier).updateFlashcard(updatedCard);
+              }
+            }
+            
+            final offlineFlashcards = ref.read(offlineFlashcardsProvider);
+            if (offlineFlashcards.value != null) {
+              final cardToUpdate = offlineFlashcards.value!.firstWhereOrNull(
+                (card) => card.id == flashcard.id,
+              );
+              
+              if (cardToUpdate != null) {
+                final updatedCard = cardToUpdate.copyWith(
+                  srsInterval: updatedItem.interval.toDouble(), // Keep?
+                  srsEaseFactor: updatedItem.personalDifficultyFactor, // Map PDF to EaseFactor
+                  srsNextReviewDate: updatedItem.nextReviewDate.millisecondsSinceEpoch,
+                  srsLastReviewDate: updatedItem.lastReviewDate?.millisecondsSinceEpoch, // Added
+                  srsBaseIntervalIndex: updatedItem.baseIntervalIndex, // Added
+                  srsQuickStreak: updatedItem.quickStreak, // Added
+                  srsIsPriority: updatedItem.isPriority, // Added
+                  srsIsInLearningPhase: updatedItem.isInLearningPhase, // Added
+                );
+                await ref.read(offlineFlashcardsProvider.notifier).updateCard(updatedCard);
+              }
+            }
+            
             final newReviewedCards = {...reviewedCards.value};
             newReviewedCards[flashcard.id] = (updatedItem, rating);
             reviewedCards.value = newReviewedCards;
             
-            // Update the database immediately (online or offline)
-            final isOnline = ref.read(isOnlineProvider);
-            try {
-              if (isOnline) {
-                final flashcardsData = ref.read(flashcardStateProvider).value;
-                if (flashcardsData != null && flashcardsData.isNotEmpty) {
-                  final cardToUpdate = flashcardsData.firstWhere(
-                    (card) => card.id == flashcard.id,
-                    orElse: () => flashcardsData.first,
-                  );
-                  
-                  final updatedCard = cardToUpdate.copyWith(
-                    srsInterval: updatedItem.interval.toDouble(),
-                    srsEaseFactor: updatedItem.personalDifficultyFactor,
-                    srsNextReviewDate: updatedItem.nextReviewDate.millisecondsSinceEpoch,
-                  );
-                  await ref.read(flashcardStateProvider.notifier).updateFlashcard(updatedCard);
-                }
-              } else {
-                final flashcardsData = ref.read(offlineFlashcardsProvider).value;
-                if (flashcardsData != null && flashcardsData.isNotEmpty) {
-                  final cardToUpdate = flashcardsData.firstWhere(
-                    (card) => card.id == flashcard.id,
-                    orElse: () => flashcardsData.first,
-                  );
-                  
-                  final updatedCard = cardToUpdate.copyWith(
-                    srsInterval: updatedItem.interval.toDouble(),
-                    srsEaseFactor: updatedItem.personalDifficultyFactor,
-                    srsNextReviewDate: updatedItem.nextReviewDate.millisecondsSinceEpoch,
-                  );
-                  await ref.read(offlineFlashcardsProvider.notifier).updateCard(updatedCard);
-                }
-              }
-            } catch (e) {
-              print('Failed to update card in database: $e');
-              // Show a snackbar or toast message if you want to notify the user
-            }
+            final currentDueItems = List<srs_model.FlashcardItem>.from(dueItemsState.value);
+            currentDueItems.removeWhere((item) => item.id == updatedItem.id); 
+            dueItemsState.value = currentDueItems;
             
-            // Update the UI with the remaining cards
-            final newDueItems = dueItemsState.value.where((item) => item.id != flashcard.id).toList();
-            dueItemsState.value = newDueItems;
-            
-            if (newDueItems.isNotEmpty) {
-              updateCurrentImageUrl(newDueItems.first.id);
-            } else {
-              currentImageUrl.value = null;
-            }
-            
-            if (newDueItems.isEmpty) {
+            if (dueItemsState.value.isEmpty) {
               isSessionComplete.value = true;
             }
           }
@@ -422,6 +388,7 @@ class LearnScreen extends HookConsumerWidget {
         updateCurrentImageUrl,
         currentImageUrl,
         srsManager,
+        ref,
       ),
     );
   }

@@ -233,14 +233,13 @@ class _FlashcardViewState extends State<FlashcardView> {
               ),
             const SizedBox(height: 32),
             Wrap(
-              spacing: 8,
+              spacing: 12, // Increased spacing slightly
               runSpacing: 8,
               alignment: WrapAlignment.center,
               children: [
-                _buildRatingButton('Again', Colors.red, flashcard),
-                _buildRatingButton('Hard', Colors.orange, flashcard),
-                _buildRatingButton('Good', Colors.green, flashcard),
-                _buildRatingButton('Easy', Colors.blue, flashcard),
+                _buildRatingButton('Missed', Colors.red.shade400, flashcard),
+                _buildRatingButton('Got It', Colors.blue.shade400, flashcard),
+                _buildRatingButton('Quick', Colors.green.shade400, flashcard),
               ],
             ),
           ],
@@ -271,14 +270,13 @@ class _FlashcardViewState extends State<FlashcardView> {
           ),
         const SizedBox(height: 32),
         Wrap(
-          spacing: 8,
+          spacing: 12, // Increased spacing slightly
           runSpacing: 8,
           alignment: WrapAlignment.center,
           children: [
-            _buildRatingButton('Again', Colors.red, flashcard),
-            _buildRatingButton('Hard', Colors.orange, flashcard),
-            _buildRatingButton('Good', Colors.green, flashcard),
-            _buildRatingButton('Easy', Colors.blue, flashcard),
+            _buildRatingButton('Missed', Colors.red.shade400, flashcard),
+            _buildRatingButton('Got It', Colors.blue.shade400, flashcard),
+            _buildRatingButton('Quick', Colors.green.shade400, flashcard),
           ],
         ),
       ],
@@ -308,10 +306,10 @@ class _FlashcardViewState extends State<FlashcardView> {
     FlashcardItem flashcard,
   ) {
     return SizedBox(
-      width: 80,
+      width: 90, // Slightly wider buttons
       child: ElevatedButton(
         onPressed: () {
-          widget.onRatingSelected(label.toLowerCase(), flashcard);
+          widget.onRatingSelected(label, flashcard); // Pass exact label
           controller.swipe(CardSwiperDirection.left);
         },
         style: ElevatedButton.styleFrom(

@@ -12,6 +12,11 @@ class OnlineFlashcard extends Flashcard {
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final List<String> stackIds;
+  // New AdaptiveFlow fields
+  final int srsBaseIntervalIndex;
+  final int srsQuickStreak;
+  final bool srsIsPriority;
+  final bool srsIsInLearningPhase;
 
   OnlineFlashcard({
     required String id,
@@ -28,6 +33,11 @@ class OnlineFlashcard extends Flashcard {
     this.createdAt,
     this.updatedAt,
     this.stackIds = const [],
+    // Add new fields to constructor with defaults
+    this.srsBaseIntervalIndex = 0,
+    this.srsQuickStreak = 0,
+    this.srsIsPriority = false,
+    this.srsIsInLearningPhase = true,
     String description = '', // Added description parameter
   }) : super(
           id: id,
@@ -37,9 +47,16 @@ class OnlineFlashcard extends Flashcard {
           nativeLanguageCode: nativeLanguage.code,
           imageUrl: imageUrl,
           cachedImagePath: cachedImagePath,
-          nextReviewDate: DateTime.fromMillisecondsSinceEpoch(srsNextReviewDate),
-          reviewLevel: 0, // Add appropriate default or parameter
-          description: description, // Pass description to super
+          // Pass fields directly to super
+          srsInterval: srsInterval,
+          srsEaseFactor: srsEaseFactor,
+          srsNextReviewDate: srsNextReviewDate,
+          description: description, 
+          srsLastReviewDate: srsLastReviewDate,
+          srsBaseIntervalIndex: srsBaseIntervalIndex,
+          srsQuickStreak: srsQuickStreak,
+          srsIsPriority: srsIsPriority,
+          srsIsInLearningPhase: srsIsInLearningPhase,
         );
 
   OnlineFlashcard copyWith({
@@ -58,6 +75,11 @@ class OnlineFlashcard extends Flashcard {
     DateTime? updatedAt,
     List<String>? stackIds,
     String? description, // Added description parameter
+    // Add new fields to copyWith
+    int? srsBaseIntervalIndex,
+    int? srsQuickStreak,
+    bool? srsIsPriority,
+    bool? srsIsInLearningPhase,
   }) {
     return OnlineFlashcard(
       id: id ?? this.id,
@@ -75,6 +97,11 @@ class OnlineFlashcard extends Flashcard {
       updatedAt: updatedAt ?? this.updatedAt,
       stackIds: stackIds ?? this.stackIds,
       description: description ?? this.description, // Added description to copyWith
+      // Use new fields in copyWith
+      srsBaseIntervalIndex: srsBaseIntervalIndex ?? this.srsBaseIntervalIndex,
+      srsQuickStreak: srsQuickStreak ?? this.srsQuickStreak,
+      srsIsPriority: srsIsPriority ?? this.srsIsPriority,
+      srsIsInLearningPhase: srsIsInLearningPhase ?? this.srsIsInLearningPhase,
     );
   }
 
@@ -96,6 +123,11 @@ class OnlineFlashcard extends Flashcard {
       'updated_at': now.toIso8601String(),
       'stack_ids': stackIds,
       'description': description, // Added description to map
+      // Add new fields to map
+      'srs_base_interval_index': srsBaseIntervalIndex,
+      'srs_quick_streak': srsQuickStreak,
+      'srs_is_priority': srsIsPriority ? 1 : 0, // Store bool as int
+      'srs_is_in_learning_phase': srsIsInLearningPhase ? 1 : 0, // Store bool as int
     };
   }
 
@@ -136,6 +168,15 @@ class OnlineFlashcard extends Flashcard {
       return 0.0;
     }
 
+    // Helper function to handle integer values that might come as strings or doubles
+    int parseInt(dynamic value) {
+      if (value == null) return 0;
+      if (value is int) return value;
+      if (value is double) return value.toInt();
+      if (value is String) return int.tryParse(value) ?? 0;
+      return 0;
+    }
+
     // Parse nested Language objects or fallback to codes
     final targetLangMap = map['target_language'] as Map<String, dynamic>?;
     final nativeLangMap = map['native_language'] as Map<String, dynamic>?;
@@ -162,6 +203,11 @@ class OnlineFlashcard extends Flashcard {
       updatedAt: parseDateTime(map['updated_at']),
       stackIds: List<String>.from(map['stack_ids'] ?? []),
       description: map['description'] as String? ?? '', // Added description from map
+      // Read new fields from map with defaults, using parseInt for ints
+      srsBaseIntervalIndex: parseInt(map['srs_base_interval_index']), 
+      srsQuickStreak: parseInt(map['srs_quick_streak']), 
+      srsIsPriority: (map['srs_is_priority'] == true || map['srs_is_priority'] == 1), // Handle bool or int
+      srsIsInLearningPhase: (map['srs_is_in_learning_phase'] == true || map['srs_is_in_learning_phase'] == 1), // Handle bool or int
     );
   }
 

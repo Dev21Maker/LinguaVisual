@@ -32,23 +32,30 @@ class AdaptiveFlowAlgorithm {
   /// The maximum allowed personal difficulty factor
   static const double maximumPersonalDifficultyFactor = 2.0;
   
-  /// The amount to decrease PDF for a "Quick" response
-  static const double quickResponsePdfDecrease = 0.15;
+  /// The amount to decrease PDF for an "easy" response
+  static const double easyResponsePdfDecrease = 0.15;
   
-  /// The amount to increase PDF for a "Missed" response
+  /// The amount to increase PDF for a "missed" response
   static const double missedResponsePdfIncrease = 0.2;
   
   /// The streak bonus percentage for on-time reviews
   static const double onTimeReviewBonus = 0.05;
   
-  /// The streak bonus percentage for consecutive quick responses
-  static const double quickStreakBonus = 0.1;
+  /// The streak bonus percentage for consecutive "easy" responses
+  static const double easyStreakBonus = 0.1;
   
-  /// The minimum number of consecutive quick responses to trigger a streak bonus
-  static const int quickStreakThreshold = 3;
+  /// The minimum number of consecutive "easy" responses to trigger a streak bonus
+  static const int easyStreakThreshold = 3;
   
   /// The number of steps to go back in the interval sequence when an item is missed
   static const int missedStepBack = 2;
+
+  /// Modifiers applied to the interval based on review type difficulty
+  static const Map<ReviewType, double> reviewTypeModifiers = {
+    ReviewType.multipleChoice: 0.9, // Easier, slightly shorter interval
+    ReviewType.listening: 1.0,      // Standard interval
+    ReviewType.typing: 1.1,         // Harder, slightly longer interval
+  };
 
   /// Updates a flashcard's SRS parameters based on the review outcome and type.
   ///
@@ -99,62 +106,56 @@ class AdaptiveFlowAlgorithm {
         learningPhaseProgress: newLearningProgress,
         nextReviewDate: newNextReviewDate,
         lastReviewType: newLastReviewType,
+        repeatedToday: item.repeatedToday + 1,
         isPriority: true, // Mark as priority to ensure it appears early in next session
       );
     }
     
-    // For successful responses (gotIt or quick)
-    int newLearningProgress = item.learningPhaseProgress + 1;
-    
-    // Check if the card has graduated from learning phase
-    bool hasGraduated = newLearningProgress >= learningPhaseRequiredReviews;
-    
-    // If graduated, move to review phase with initial interval
-    if (hasGraduated) {
-      // Set initial interval based on performance
-      int initialIntervalIndex = outcome == ReviewOutcome.quick ? 3 : 2; // 3 days for quick, 1 day for gotIt
-      int newInterval = baseIntervals[initialIntervalIndex];
+    // For hard responses in learning phase
+    if (outcome == ReviewOutcome.hard) {
+      // Keep learning progress the same
+      int newLearningProgress = item.learningPhaseProgress;
       
-      // Set initial PDF based on performance
-      double newPdf = outcome == ReviewOutcome.quick 
-          ? defaultPersonalDifficultyFactor - quickResponsePdfDecrease 
-          : defaultPersonalDifficultyFactor;
-      
-      // Calculate next review date
-      final DateTime newNextReviewDate = DateTime.now().add(Duration(days: newInterval));
-      
-      // Update quick streak if applicable
-      int newQuickStreak = outcome == ReviewOutcome.quick ? 1 : 0;
+      // Schedule for review in 1 hour
+      final DateTime newNextReviewDate = DateTime.now().add(Duration(hours: 1));
       
       return item.copyWith(
-        interval: newInterval,
-        personalDifficultyFactor: newPdf,
         reviews: newReviews,
-        nextReviewDate: newNextReviewDate,
-        isInLearningPhase: false, // Graduate from learning phase
         learningPhaseProgress: newLearningProgress,
-        quickStreak: newQuickStreak,
+        nextReviewDate: newNextReviewDate,
         lastReviewType: newLastReviewType,
-        isPriority: false,
+        repeatedToday: item.repeatedToday + 1,
+        isPriority: true, // Mark as priority but less urgent than missed
       );
     }
     
-    // Still in learning phase, schedule next review based on progress
-    Duration nextReviewDelay;
-    if (newLearningProgress == 1) {
-      nextReviewDelay = Duration(hours: 1); // First successful review -> 1 hour
-    } else {
-      nextReviewDelay = Duration(hours: 5); // Second successful review -> 5 hours
-    }
+    // For successful responses (good or easy)
+    int newLearningProgress = item.learningPhaseProgress + 1;
     
-    final DateTime newNextReviewDate = DateTime.now().add(nextReviewDelay);
+    // Check if we've completed the required number of successful reviews to graduate
+    bool shouldGraduate = newLearningProgress >= learningPhaseRequiredReviews;
+    
+    DateTime newNextReviewDate;
+    if (shouldGraduate) {
+      // Graduate to review phase: first review after 1 day
+      // (or 2 days for "easy" responses)
+      int graduationInterval = outcome == ReviewOutcome.easy ? 2 : 1;
+      newNextReviewDate = DateTime.now().add(Duration(days: graduationInterval));
+    } else {
+      // Still in learning phase: next review after 4 hours
+      // (or 8 hours for "easy" responses)
+      int learningHours = outcome == ReviewOutcome.easy ? 8 : 4;
+      newNextReviewDate = DateTime.now().add(Duration(hours: learningHours));
+    }
     
     return item.copyWith(
       reviews: newReviews,
       learningPhaseProgress: newLearningProgress,
+      isInLearningPhase: !shouldGraduate,
+      interval: shouldGraduate ? (outcome == ReviewOutcome.easy ? 2 : 1) : 0,
       nextReviewDate: newNextReviewDate,
       lastReviewType: newLastReviewType,
-      isPriority: false,
+      repeatedToday: 0,
     );
   }
   
@@ -165,116 +166,117 @@ class AdaptiveFlowAlgorithm {
     ReviewType reviewType,
     int newReviews
   ) {
-    // Calculate new interval, PDF, and other parameters based on the outcome
-    int newInterval;
-    double newPdf;
-    int newQuickStreak;
-    bool newIsPriority;
-    
-    // Get the current interval index in the sequence
-    int currentIntervalIndex = _getIntervalIndex(item.interval);
-    
-    switch (outcome) {
-      case ReviewOutcome.missed:
-        // Go back in the interval sequence
-        int newIntervalIndex = currentIntervalIndex > missedStepBack 
-            ? currentIntervalIndex - missedStepBack 
-            : 2; // Minimum of 1 day (index 2)
-        
-        newInterval = baseIntervals[newIntervalIndex];
-        
-        // Increase PDF (make card harder)
-        newPdf = _adjustPdf(item.personalDifficultyFactor, missedResponsePdfIncrease);
-        
-        // Reset quick streak
-        newQuickStreak = 0;
-        
-        // Mark as priority
-        newIsPriority = true;
-        break;
-        
-      case ReviewOutcome.gotIt:
-        // Move to next interval in sequence
-        int newIntervalIndex = currentIntervalIndex < baseIntervals.length - 1 
-            ? currentIntervalIndex + 1 
-            : baseIntervals.length - 1;
-        
-        newInterval = baseIntervals[newIntervalIndex];
-        
-        // Keep PDF the same
-        newPdf = item.personalDifficultyFactor;
-        
-        // Reset quick streak
-        newQuickStreak = 0;
-        
-        // Not a priority
-        newIsPriority = false;
-        break;
-        
-      case ReviewOutcome.quick:
-        // Move to next interval in sequence
-        int newIntervalIndex = currentIntervalIndex < baseIntervals.length - 1 
-            ? currentIntervalIndex + 1 
-            : baseIntervals.length - 1;
-        
-        newInterval = baseIntervals[newIntervalIndex];
-        
-        // Decrease PDF (make card easier)
-        newPdf = _adjustPdf(item.personalDifficultyFactor, -quickResponsePdfDecrease);
-        
-        // Increment quick streak
-        newQuickStreak = item.quickStreak + 1;
-        
-        // Not a priority
-        newIsPriority = false;
-        break;
-    }
-    
-    // Apply review type modifier
-    double typeModifier = reviewType.intervalModifier;
-    newInterval = (newInterval * typeModifier).round();
-    
-    // Apply streak bonuses
+    final now = DateTime.now();
+    double currentPdf = item.personalDifficultyFactor;
+    int currentBaseIndex = item.baseIntervalIndex;
+    int currentQuickStreak = item.quickStreak;
+    int nextBaseIndex = currentBaseIndex;
+    double pdfDelta = 0.0;
     double bonusMultiplier = 1.0;
-    
-    // On-time review bonus
-    DateTime now = DateTime.now();
-    bool isOnTime = !item.nextReviewDate.isAfter(now.add(Duration(days: 1)));
-    if (isOnTime) {
-      bonusMultiplier += onTimeReviewBonus;
+    bool setPriority = false;
+
+    // 1. Handle Missed Outcome
+    if (outcome == ReviewOutcome.missed || outcome == ReviewOutcome.hard) {
+      // Increase PDF
+      pdfDelta = missedResponsePdfIncrease;
+      // Step back in interval sequence
+      nextBaseIndex = (currentBaseIndex - missedStepBack).clamp(1, baseIntervals.length - 1); // Clamp ensures we don't go below index 1
+      // Set priority flag
+      setPriority = true;
+      // Reset quick streak
+      currentQuickStreak = 0;
+    } else {
+      // 2. Handle Correct Outcomes (Easy/Good)
+      setPriority = false; // Clear priority flag on correct review
+
+      if (outcome == ReviewOutcome.easy) {
+        // Decrease PDF
+        pdfDelta = -easyResponsePdfDecrease;
+        // Increment quick streak
+        currentQuickStreak++;
+        // Advance interval sequence
+        nextBaseIndex = (currentBaseIndex + 1).clamp(1, baseIntervals.length - 1);
+      } else { // ReviewOutcome.good
+        // No PDF change for 'good'
+        pdfDelta = 0.0;
+        // Reset quick streak for 'good'
+        currentQuickStreak = 0;
+        // Advance interval sequence
+        nextBaseIndex = (currentBaseIndex + 1).clamp(1, baseIntervals.length - 1);
+      }
+
+      // 3. Apply Bonuses (only for correct outcomes)
+      // On-time bonus (review done within ~20% tolerance of interval)
+      if (item.lastReviewDate != null) {
+          final expectedReviewDate = item.lastReviewDate!.add(Duration(days: item.interval));
+          final daysLate = now.difference(expectedReviewDate).inDays;
+          // Allow some flexibility (e.g., reviewed within 20% of the interval duration past the due date)
+          if (daysLate.abs() <= (item.interval * 0.2).ceil()) {
+              bonusMultiplier += onTimeReviewBonus;
+          }
+      }
+
+      // Easy streak bonus
+      if (currentQuickStreak >= easyStreakThreshold) {
+        bonusMultiplier += easyStreakBonus;
+      }
     }
-    
-    // Quick streak bonus
-    if (outcome == ReviewOutcome.quick && newQuickStreak >= quickStreakThreshold) {
-      bonusMultiplier += quickStreakBonus;
+
+    // 4. Adjust PDF
+    double newPdf = _adjustPdf(currentPdf, pdfDelta);
+
+    // 5. Calculate Next Interval Duration
+    double baseIntervalDays = baseIntervals[nextBaseIndex].toDouble();
+    double reviewModifier = reviewTypeModifiers[reviewType] ?? 1.0;
+    double calculatedIntervalDays = baseIntervalDays * newPdf * reviewModifier * bonusMultiplier;
+
+    // Apply max interval cap (convert days to int, ensure minimum 1 day if not index 1 which is hours)
+    int newIntervalDays = calculatedIntervalDays.round().clamp(nextBaseIndex == 1 ? 0 : 1, baseIntervals.last);
+    if (nextBaseIndex == 1 && newIntervalDays == 0) { // Special case for first step (hours)
+       // Calculate in hours based on PDF/modifiers if base is 0 days
+       // Example: Base interval 1 is 'same day, hours later'. Let's target ~4 hours base.
+       calculatedIntervalDays = (4 / 24.0) * newPdf * reviewModifier * bonusMultiplier; 
+       // Still store 0 in interval field, but use hours for nextReviewDate
+       newIntervalDays = 0; 
+    } else {
+        // If calculated interval forces index beyond max, use max interval index
+        if (newIntervalDays >= baseIntervals.last) {
+            nextBaseIndex = baseIntervals.length - 1;
+            newIntervalDays = baseIntervals.last;
+        }
     }
-    
-    // Apply bonus to interval
-    newInterval = (newInterval * bonusMultiplier).round();
-    
-    // Apply personal difficulty factor
-    newInterval = (newInterval * newPdf).round();
-    
-    // Ensure interval is at least 1 day
-    newInterval = newInterval < 1 ? 1 : newInterval;
-    
-    // Calculate next review date
-    final DateTime newNextReviewDate = DateTime.now().add(Duration(days: newInterval));
-    
-    // Update the last review type
-    String newLastReviewType = reviewType.asString;
-    
+
+
+    // 6. Calculate Next Review Date
+    Duration nextDuration;
+    if (nextBaseIndex == 1 && newIntervalDays == 0) { // Use hours for index 1
+         int hours = (calculatedIntervalDays * 24).round().clamp(1, 12); // Clamp hours e.g. 1-12h
+         nextDuration = Duration(hours: hours);
+    } else if (outcome == ReviewOutcome.missed || outcome == ReviewOutcome.hard) {
+        // For missed/hard, schedule relative to NOW, e.g., 10-30 minutes for immediate re-review
+         nextDuration = Duration(minutes: 30); // Review again soon
+         setPriority = true; // Ensure priority remains set
+         // Keep nextBaseIndex stepped back, but force immediate review
+    } else {
+        nextDuration = Duration(days: newIntervalDays);
+    }
+    DateTime newNextReviewDate = now.add(nextDuration);
+
+    // 7. Update Item
     return item.copyWith(
-      interval: newInterval,
+      interval: newIntervalDays, // Store calculated interval days
+      baseIntervalIndex: nextBaseIndex,
       personalDifficultyFactor: newPdf,
       reviews: newReviews,
+      lastReviewDate: now, // Update last review date
       nextReviewDate: newNextReviewDate,
-      quickStreak: newQuickStreak,
-      lastReviewType: newLastReviewType,
-      isPriority: newIsPriority,
+      quickStreak: currentQuickStreak,
+      lastReviewType: reviewType.asString,
+      isPriority: setPriority,
+      repeatedToday: (outcome == ReviewOutcome.missed || outcome == ReviewOutcome.hard) ? item.repeatedToday + 1 : 0, // Reset counter on correct
     );
   }
-  
+
   /// Adjusts the personal difficulty factor by the given delta, ensuring it stays within bounds
   double _adjustPdf(double currentPdf, double delta) {
     double newPdf = currentPdf + delta;
@@ -288,19 +290,6 @@ class AdaptiveFlowAlgorithm {
     }
     
     return newPdf;
-  }
-  
-  /// Gets the index of the given interval in the baseIntervals array
-  int _getIntervalIndex(int interval) {
-    // Find the closest match in the baseIntervals array
-    for (int i = 0; i < baseIntervals.length; i++) {
-      if (interval <= baseIntervals[i]) {
-        return i;
-      }
-    }
-    
-    // If larger than any interval, return the last index
-    return baseIntervals.length - 1;
   }
   
   /// Determines the optimal review type for a flashcard based on its difficulty

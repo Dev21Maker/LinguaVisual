@@ -20,8 +20,9 @@ class SM2Algorithm {
   ///
   /// This method implements a modified SM-2 algorithm logic adapted for AdaptiveFlow:
   /// - For 'missed': Reset interval and increase personal difficulty factor
-  /// - For 'gotIt': Increase interval according to the algorithm and keep PDF unchanged
-  /// - For 'quick': Increase interval more than 'gotIt' and decrease personal difficulty factor
+  /// - For 'hard': Small interval progression with slight PDF increase
+  /// - For 'good': Increase interval according to the algorithm and keep PDF unchanged
+  /// - For 'easy': Increase interval more than 'good' and decrease personal difficulty factor
   ///
   /// Returns the updated flashcard item.
   FlashcardItem processReview(FlashcardItem item, ReviewOutcome outcome, [ReviewType reviewType = ReviewType.typing]) {
@@ -29,8 +30,8 @@ class SM2Algorithm {
     int newReviews = item.reviews + 1;
     
     // Calculate new interval and personal difficulty factor based on the outcome
-    int newInterval;
-    double newPdf;
+    int newInterval = item.interval;
+    double newPdf = item.personalDifficultyFactor;
     
     switch (outcome) {
       case ReviewOutcome.missed:
@@ -39,24 +40,36 @@ class SM2Algorithm {
         newPdf = _adjustPdf(item.personalDifficultyFactor, 0.20);
         break;
         
-      case ReviewOutcome.gotIt:
+      case ReviewOutcome.hard:
+        // Small interval progression with slight PDF increase
+        if (item.reviews == 0) {
+          newInterval = initialInterval;
+        } else if (item.reviews == 1) {
+          newInterval = 4; // Second review as "hard" should be a bit shorter than "good"
+        } else {
+          newInterval = (item.interval * 0.8).round(); // Reduce interval by 20%
+        }
+        newPdf = _adjustPdf(item.personalDifficultyFactor, 0.05); // Small increase for hard
+        break;
+        
+      case ReviewOutcome.good:
         // Standard interval progression
         if (item.reviews == 0) {
           newInterval = initialInterval;
         } else if (item.reviews == 1) {
-          newInterval = 6; // Second review as "gotIt" jumps to 6 days
+          newInterval = 6; // Second review as "good" jumps to 6 days
         } else {
           newInterval = (item.interval * item.personalDifficultyFactor).round();
         }
         newPdf = item.personalDifficultyFactor; // Keep PDF unchanged
         break;
         
-      case ReviewOutcome.quick:
+      case ReviewOutcome.easy:
         // Larger interval increase and PDF decrease
         if (item.reviews == 0) {
-          newInterval = 4; // First review as "quick" jumps to 4 days
+          newInterval = 4; // First review as "easy" jumps to 4 days
         } else if (item.reviews == 1) {
-          newInterval = 8; // Second review as "quick" jumps to 8 days
+          newInterval = 8; // Second review as "easy" jumps to 8 days
         } else {
           newInterval = (item.interval * item.personalDifficultyFactor * 1.3).round();
         }
@@ -68,12 +81,12 @@ class SM2Algorithm {
     if (reviewType != null) {
       newInterval = (newInterval * reviewType.intervalModifier).round();
     }
-      
+    
     // Calculate the next review date
     final DateTime newNextReviewDate = DateTime.now().add(Duration(days: newInterval));
     
     // Update last review type
-    String newLastReviewType = reviewType?.asString ?? 'typing';
+    String newLastReviewType = reviewType.asString;
     
     // Return updated flashcard
     return item.copyWith(

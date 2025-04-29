@@ -27,6 +27,7 @@ class LearnScreen extends HookConsumerWidget {
     final isSessionComplete = useState(false);
     final srsManager = useMemoized(() => srs_package.SRSManager(), []);
     final currentImageUrl = useState<String?>(null);
+    final showLoadMoreOption = useState(false);
 
     String? _getImageUrlForCard(String flashcardId) {
       final flashcardsData = ref.read(flashcardStateProvider).value;
@@ -42,40 +43,6 @@ class LearnScreen extends HookConsumerWidget {
     void updateCurrentImageUrl(String flashcardId) {
       currentImageUrl.value = _getImageUrlForCard(flashcardId);
     }
-
-    useEffect(() {
-      final currentRef = ref;
-      
-      return () async {
-        if (reviewedCards.value.isNotEmpty) {
-          try {
-            for (final entry in reviewedCards.value.entries) {
-              final (flashcardItem, rating) = entry.value;
-              try {
-                final flashcardsData = currentRef.read(flashcardStateProvider).value;
-                if (flashcardsData == null || flashcardsData.isEmpty) continue;
-                  
-                final cardToUpdate = flashcardsData.firstWhere(
-                  (card) => card.id == flashcardItem.id,
-                  orElse: () => flashcardsData.first,
-                );
-                  
-                final updatedCard = cardToUpdate.copyWith(
-                  srsInterval: flashcardItem.interval.toDouble(),
-                  srsEaseFactor: flashcardItem.personalDifficultyFactor,
-                  srsNextReviewDate: flashcardItem.nextReviewDate.millisecondsSinceEpoch,
-                );
-                await currentRef.read(flashcardStateProvider.notifier).updateFlashcard(updatedCard);
-              } catch (e) {
-                debugPrint('Failed to save reviewed card: $e');
-              }
-            }
-          } catch (e) {
-            debugPrint('Widget disposed, cannot save reviewed cards: $e');
-          }
-        }
-      };
-    }, []);
 
     Future<void> loadDueCards() async {
       isLoadingState.value = true;
@@ -133,9 +100,13 @@ class LearnScreen extends HookConsumerWidget {
           final dueItems = srsManager.getDueItems(DateTime.now());
           dueItemsState.value = dueItems;
           
+          if (dueItems.isEmpty) {
+            showLoadMoreOption.value = true;
+          }
+          
           isLoadingState.value = false;
           if (dueItems.isEmpty) {
-            showEmptyState.value = true;
+            showEmptyState.value = true; 
           }
         });
       } catch (e) {
@@ -211,6 +182,29 @@ class LearnScreen extends HookConsumerWidget {
       );
     }
 
+    void _loadNextClosestCards(
+      srs_package.SRSManager srsManager,
+      ValueNotifier<List<srs_model.FlashcardItem>> dueItemsState,
+      ValueNotifier<Map<String, (srs_model.FlashcardItem, String)>> reviewedCards,
+      ValueNotifier<bool> isLoadingState,
+      ValueNotifier<bool> showLoadMoreOption
+    ) {
+      isLoadingState.value = true;
+      showLoadMoreOption.value = false; // Hide the button while loading
+
+      final allSortedItems = srsManager.getAllItemsSortedByNextReview();
+      final reviewedIds = reviewedCards.value.keys.toSet();
+
+      // Filter out cards already reviewed in this session and take the next 30
+      final nextClosestItems = allSortedItems
+          .where((item) => !reviewedIds.contains(item.id))
+          .take(30)
+          .toList();
+
+      dueItemsState.value = nextClosestItems;
+      isLoadingState.value = false;
+    }
+
     Widget _buildBody(
       BuildContext context,
       bool isLoading,
@@ -249,6 +243,28 @@ class LearnScreen extends HookConsumerWidget {
         );
       }
 
+      if (showLoadMoreOption.value && dueItemsState.value.isEmpty && !isLoadingState.value) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text('No more cards due right now.'),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () => _loadNextClosestCards(
+                  srsManager,
+                  dueItemsState,
+                  reviewedCards,
+                  isLoadingState,
+                  showLoadMoreOption,
+                ),
+                child: const Text('Review Upcoming Cards (Max 30)'),
+              ),
+            ],
+          ),
+        );
+      }
+
       if (dueItems.isEmpty) {
         return Center(
           child: Column(
@@ -279,10 +295,10 @@ class LearnScreen extends HookConsumerWidget {
               outcome = srs_outcome.ReviewOutcome.hard;
               break;
             case 'Got It':
-              outcome = srs_outcome.ReviewOutcome.good;
-              break;
-            case 'Quick':
               outcome = srs_outcome.ReviewOutcome.easy;
+              break;
+            case 'Lucky Guess':
+              outcome = srs_outcome.ReviewOutcome.good;
               break;
             default:
               print('Unknown rating: $rating, defaulting to missed'); // Log unexpected ratings

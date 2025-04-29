@@ -20,7 +20,8 @@ class OfflineTrainingScreen extends HookConsumerWidget {
       );
     }
 
-    final currentCard = flashcards.value![currentIndex];
+    // Get current card, handling index bounds
+    final currentOfflineCard = currentIndex < flashcards.value!.length ? flashcards.value![currentIndex] : null;
 
     Future<void> onRatingSelected(String rating) async {
       // Update SRS data based on rating
@@ -81,7 +82,8 @@ class OfflineTrainingScreen extends HookConsumerWidget {
         padding: const EdgeInsets.all(16.0),
         child: SafeArea(
           child: FlashcardView(
-            flashcards: [FlashcardConverters.offlineToFlashcardItem(currentCard)],  // Wrap in list
+            // Convert OfflineFlashcard to FlashcardItem before passing
+            flashcards: currentOfflineCard != null ? [FlashcardConverters.offlineToFlashcardItem(currentOfflineCard)] : [], 
             onRatingSelected: (rating, _) => onRatingSelected(rating),
           ),
         ),

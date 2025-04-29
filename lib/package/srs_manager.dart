@@ -78,6 +78,13 @@ class SRSManager {
     return _algorithm.prioritizeReviews(dueItems);
   }
 
+  /// Returns a list of all flashcard items, sorted by their next review date (ascending).
+  List<FlashcardItem> getAllItemsSortedByNextReview() {
+    final sortedItems = List<FlashcardItem>.from(_items);
+    sortedItems.sort((a, b) => a.nextReviewDate.compareTo(b.nextReviewDate));
+    return sortedItems;
+  }
+
   /// Removes a flashcard item from the system.
   ///
   /// Returns true if an item was removed, false if no item with the given ID was found.

@@ -59,12 +59,13 @@ class _FlashcardViewState extends State<FlashcardView> {
       cardBuilder: (context, index, percentThresholdX, percentThresholdY) {
         // Add bounds check to prevent index out of range
         if (index >= widget.flashcards.length) {
+          print("Index out of bounds: $index/${widget.flashcards.length}");
           return const SizedBox.shrink(); // Return empty widget for invalid indices
         }
         return _buildFlashcard(widget.flashcards[index]);
       },
       onSwipe: (previousIndex, currentIndex, direction) {
-        return true;
+        return false;
       },
       backCardOffset: const Offset(40, 40),
       padding: const EdgeInsets.all(24.0),
@@ -238,8 +239,8 @@ class _FlashcardViewState extends State<FlashcardView> {
               alignment: WrapAlignment.center,
               children: [
                 _buildRatingButton('Missed', Colors.red.shade400, flashcard),
-                _buildRatingButton('Got It', Colors.blue.shade400, flashcard),
-                _buildRatingButton('Quick', Colors.green.shade400, flashcard),
+                _buildRatingButton('Got It', Colors.blue.shade400, flashcard, direction: CardSwiperDirection.right),
+                _buildRatingButton('Lucky Guess', Colors.green.shade400, flashcard, direction: CardSwiperDirection.right, isLonger: true),
               ],
             ),
           ],
@@ -249,37 +250,40 @@ class _FlashcardViewState extends State<FlashcardView> {
   }
 
   Widget _buildTranslationAndRatingButtons(FlashcardItem flashcard) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (!(translationVisible[flashcard.id] ?? false))
-          IconButton(
-            onPressed:
-                () => setState(() => translationVisible[flashcard.id] = true),
-            icon: const Icon(Icons.visibility, color: Colors.white, size: 28),
-          ),
-        if (translationVisible[flashcard.id] ?? false)
-          Text(
-            flashcard.answer,
-            style: const TextStyle(
-              fontSize: 24,
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
+    return Center(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (!(translationVisible[flashcard.id] ?? false))
+            IconButton(
+              onPressed:
+                  () => setState(() => translationVisible[flashcard.id] = true),
+              icon: const Icon(Icons.visibility, color: Colors.white, size: 28),
             ),
-            textAlign: TextAlign.center,
+          if (translationVisible[flashcard.id] ?? false)
+            Text(
+              flashcard.answer,
+              style: const TextStyle(
+                fontSize: 24,
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          const SizedBox(height: 32),
+          Wrap(
+            spacing: 12, // Increased spacing slightly
+            runSpacing: 8,
+            alignment: WrapAlignment.center,
+            children: [
+              _buildRatingButton('Missed', Colors.red.shade400, flashcard, direction: CardSwiperDirection.left),
+              _buildRatingButton('Got It', Colors.blue.shade400, flashcard, direction: CardSwiperDirection.right),
+              _buildRatingButton('Lucky Guess', Colors.green.shade400, flashcard, direction: CardSwiperDirection.right, isLonger: true),
+            ],
           ),
-        const SizedBox(height: 32),
-        Wrap(
-          spacing: 12, // Increased spacing slightly
-          runSpacing: 8,
-          alignment: WrapAlignment.center,
-          children: [
-            _buildRatingButton('Missed', Colors.red.shade400, flashcard),
-            _buildRatingButton('Got It', Colors.blue.shade400, flashcard),
-            _buildRatingButton('Quick', Colors.green.shade400, flashcard),
-          ],
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -303,14 +307,17 @@ class _FlashcardViewState extends State<FlashcardView> {
   Widget _buildRatingButton(
     String label,
     Color color,
-    FlashcardItem flashcard,
+    FlashcardItem flashcard, {
+    CardSwiperDirection direction = CardSwiperDirection.left,
+    bool isLonger = false,
+    }
   ) {
     return SizedBox(
-      width: 90, // Slightly wider buttons
+      width: isLonger? 100 : 90, // Slightly wider buttons
       child: ElevatedButton(
         onPressed: () {
           widget.onRatingSelected(label, flashcard); // Pass exact label
-          controller.swipe(CardSwiperDirection.left);
+          controller.swipe(direction);
         },
         style: ElevatedButton.styleFrom(
           backgroundColor: color.withOpacity(0.8),

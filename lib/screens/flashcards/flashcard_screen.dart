@@ -235,7 +235,8 @@ class FlashcardScreen extends HookConsumerWidget {
                     toggleOrder();
                     break;
                   case 'refresh':
-                    ref.refresh(flashcardStateProvider);
+                    ref.refresh(flashcardStateProvider); // Corrected provider & assigned result
+                    ref.refresh(stacksProvider); // Assigned result
                     break;
                 }
               },

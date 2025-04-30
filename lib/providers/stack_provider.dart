@@ -204,4 +204,15 @@ class StacksNotifier extends StateNotifier<AsyncValue<List<FlashcardStack>>> {
       state = AsyncValue.error(error, stackTrace);
     }
   }
+
+  Future<void> clearOfflineStackData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_offlineStacksKey);
+      state = const AsyncValue.data([]); // Reset state to empty
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      // Optionally rethrow or log the error
+    }
+  }
 }

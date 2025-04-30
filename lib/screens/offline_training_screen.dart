@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:lingua_visual/models/flashcard_converters.dart';
 import 'package:lingua_visual/providers/offline_flashcard_provider.dart';
 import '../widgets/flashcard_view.dart';
 
@@ -82,8 +81,7 @@ class OfflineTrainingScreen extends HookConsumerWidget {
         padding: const EdgeInsets.all(16.0),
         child: SafeArea(
           child: FlashcardView(
-            // Convert OfflineFlashcard to FlashcardItem before passing
-            flashcards: currentOfflineCard != null ? [FlashcardConverters.offlineToFlashcardItem(currentOfflineCard)] : [], 
+            flashcards: currentOfflineCard != null ? [currentOfflineCard] : [], 
             onRatingSelected: (rating, _) => onRatingSelected(rating),
           ),
         ),

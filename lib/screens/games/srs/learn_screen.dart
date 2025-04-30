@@ -4,131 +4,180 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:lingua_visual/models/flashcard.dart';
 import 'package:lingua_visual/providers/flashcard_provider.dart';
-import 'package:lingua_visual/providers/offline_flashcard_provider.dart';
 import 'package:lingua_visual/providers/stack_provider.dart';
 import 'package:lingua_visual/widgets/flashcard_view.dart';
-// import 'package:lingua_visual/widgets/loading_indicator.dart';
 import 'package:lingua_visual/package/srs_manager.dart' as srs_package;
-import 'package:lingua_visual/package/models/flashcard_item.dart' as srs_model;
-import 'package:lingua_visual/package/models/review_outcome.dart' as srs_outcome;
-import 'package:collection/collection.dart';
+import 'package:lingua_visual/package/algorithm/adaptive_flow_algorithm.dart' show SrsItem;
 
+// LearnScreen Widget: Manages the Spaced Repetition System (SRS) learning session.
 class LearnScreen extends HookConsumerWidget {
   const LearnScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final dueItemsState = useState<List<srs_model.FlashcardItem>>([]);
-    final reviewedCards = useState<Map<String, (srs_model.FlashcardItem, String)>>({});
+    // --- State Variables using Hooks ---
+    // Holds the list of SRS items currently due for review.
+    final dueItemsState = useState<List<SrsItem>>([]);
+    // Stores cards reviewed in the current session and the rating given ('Quick', 'Good', 'Missed').
+    final reviewedCards = useState<Map<String, (SrsItem, String)>>({});
+    // Tracks if the screen is currently loading data.
     final isLoadingState = useState(true);
+    // Holds any error message that occurred during loading or processing.
     final errorState = useState<String?>(null);
+    // Controls whether to show a message indicating no cards are due.
     final showEmptyState = useState(false);
+    // Stores the ID of the currently selected flashcard stack (null means all cards).
     final selectedStackId = useState<String?>(null);
+    // Indicates if the current learning session is complete (all due cards reviewed).
     final isSessionComplete = useState(false);
+    // Manages the SRS logic (adding items, getting due items, processing reviews).
     final srsManager = useMemoized(() => srs_package.SRSManager(), []);
-    final currentImageUrl = useState<String?>(null);
+    // Controls visibility of the 'Load More Cards' option when initial due list is empty.
     final showLoadMoreOption = useState(false);
-
-    String? _getImageUrlForCard(String flashcardId) {
-      final flashcardsData = ref.read(flashcardStateProvider).value;
-      if (flashcardsData == null || flashcardsData.isEmpty) return null;
-      
-      final flashcard = flashcardsData.firstWhere(
-        (card) => card.id == flashcardId,
-        orElse: () => flashcardsData.first,
-      );
-      return flashcard.imageUrl;
-    }
-
-    void updateCurrentImageUrl(String flashcardId) {
-      currentImageUrl.value = _getImageUrlForCard(flashcardId);
-    }
-
-    Future<void> loadDueCards() async {
+    
+    // --- Function: Process flashcards and load due cards ---
+    Future<void> processFlashcardsAndLoadDueCards(AsyncValue<List<Flashcard>> flashcardsAsync) async {
+      // Reset state for loading sequence
       isLoadingState.value = true;
       errorState.value = null;
       showEmptyState.value = false;
       dueItemsState.value = [];
-
-      final emptyStateTimer = Timer(const Duration(seconds: 7), () {
-        if (isLoadingState.value) {
-          showEmptyState.value = true;
-        }
-      });
+      showLoadMoreOption.value = false;
 
       try {
-        final flashcardsAsync = ref.read(flashcardStateProvider);
-        
-        await flashcardsAsync.whenData((flashcards) async {
-          srsManager.clear();
-          
-          if (flashcards.isEmpty) {
-            isLoadingState.value = false;
-            return;
-          }
-          
-          final filteredFlashcards = selectedStackId.value != null 
-              ? flashcards.where((card) {
-                  final stack = ref.read(stacksProvider.notifier).getStackById(selectedStackId.value!);
-                  return stack.flashcardIds.contains(card.id);
-                }).toList()
-              : flashcards;
-          
-          final items = <srs_model.FlashcardItem>[]; 
-          for (final Flashcard card in filteredFlashcards) {
-            final item = srs_model.FlashcardItem(
-              id: card.id,
-              languageId: card.targetLanguageCode,
-              question: card.word,
-              answer: card.translation,
-              interval: card.srsInterval.toInt(),
-              personalDifficultyFactor: card.srsEaseFactor,
-              nextReviewDate: DateTime.fromMillisecondsSinceEpoch(card.srsNextReviewDate),
-              lastReviewDate: card.srsLastReviewDate != null ? DateTime.fromMillisecondsSinceEpoch(card.srsLastReviewDate!) : null,
-              baseIntervalIndex: card.srsBaseIntervalIndex,
-              quickStreak: card.srsQuickStreak,
-              isPriority: card.srsIsPriority,
-              isInLearningPhase: card.srsIsInLearningPhase,
-            );
-            items.add(item);
-          }
-          
-          for (final item in items) {
-            srsManager.addItem(item);
-          }
-          
-          final dueItems = srsManager.getDueItems(DateTime.now());
-          dueItemsState.value = dueItems;
-          
-          if (dueItems.isEmpty) {
-            showLoadMoreOption.value = true;
-          }
-          
+        // Handle error state
+        if (flashcardsAsync.hasError) {
+          errorState.value = flashcardsAsync.error.toString();
           isLoadingState.value = false;
-          if (dueItems.isEmpty) {
-            showEmptyState.value = true; 
+          return;
+        }
+        
+        // Make sure we have data
+        if (!flashcardsAsync.hasValue || flashcardsAsync.value == null) {
+          showEmptyState.value = true;
+          isLoadingState.value = false;
+          return;
+        }
+        
+        final flashcards = flashcardsAsync.value!;
+        
+        // Clear any previous items in the SRS manager
+        srsManager.clear();
+        
+        debugPrint('Flashcards loaded length: ${flashcards.length}');
+
+        if (flashcards.isEmpty) {
+          showEmptyState.value = true;
+          isLoadingState.value = false;
+          return;
+        }
+        
+        // Filter flashcards based on selected stack
+        List<Flashcard> filteredFlashcards;
+        if (selectedStackId.value != null) {
+          try {
+            final stack = ref.read(stacksProvider.notifier).getStackById(selectedStackId.value!);
+            filteredFlashcards = flashcards; //.where((card) => stack.flashcardIds.contains(card.id)).toList();
+            debugPrint('Filtered flashcards length: ${filteredFlashcards.length}');
+            debugPrint('Filtered flashcards first: ${filteredFlashcards.first}');
+          } catch (e) {
+            debugPrint("Error finding stack ${selectedStackId.value}: $e");
+            errorState.value = "Error loading stack. Showing all cards.";
+            selectedStackId.value = null;
+            filteredFlashcards = List<Flashcard>.from(flashcards);
           }
-        });
+        } else {
+          filteredFlashcards = List<Flashcard>.from(flashcards);
+        }
+        
+        // Add filtered flashcards to SRS manager
+        for (final Flashcard card in filteredFlashcards) {
+          srsManager.loadOrUpdateItemFromFlashcard(card);
+        }
+        
+        // Get due items
+        final dueItems = srsManager.getAllItemsSortedByNextReview();
+        dueItemsState.value = dueItems;
+        
+        // // Show load more option if no due items but we have flashcards
+        // if (dueItems.isEmpty && filteredFlashcards.isNotEmpty) {
+        //   showLoadMoreOption.value = true;
+        // }
+        
+        // // Show empty state if no due items and no load more option
+        // if (dueItems.isEmpty && !showLoadMoreOption.value) {
+        //   showEmptyState.value = true;
+        // }
+        
       } catch (e) {
-        isLoadingState.value = false;
         errorState.value = e.toString();
         debugPrint('Error loading due cards: $e');
       } finally {
-        emptyStateTimer.cancel();
+        // Always set loading to false at the end
+        isLoadingState.value = false;
       }
     }
-
+    
+    // --- Function: Load Due Cards ---
+    // This is the public method that can be called from outside
+    Future<void> loadDueCards() async {
+      final flashcardsAsync = ref.watch(flashcardStateProvider);
+      
+      // If flashcards are still loading, set loading state and wait
+      if (flashcardsAsync.isLoading) {
+        isLoadingState.value = true;
+        return; // Wait for the useEffect to trigger when loading completes
+      }
+      print('Not loading');
+      // Otherwise, process the flashcards immediately
+      await processFlashcardsAndLoadDueCards(flashcardsAsync);
+    }
+    
+    // Watch the flashcard state to react to changes
+    final flashcardsAsync = ref.watch(flashcardStateProvider);
+    
+    // Effect to process flashcards when they become available
     useEffect(() {
+      if (!flashcardsAsync.isLoading) {
+        // Use the function that takes flashcardsAsync as a parameter
+        processFlashcardsAndLoadDueCards(flashcardsAsync);
+      }
+      return null;
+    }, [flashcardsAsync]);
+
+    // --- useEffect Hooks ---
+    // First useEffect: Watch for changes to the flashcard provider
+    useEffect(() {
+      final subscription = ref.listenManual(flashcardStateProvider, (previous, next) {
+        // Only reload if we have data and it's different from before
+        if (next.hasValue && (previous == null || !previous.hasValue || previous.value != next.value)) {
+          loadDueCards();
+        }
+      });
+      
+      // Initial load
       loadDueCards();
+      
+      return subscription.close;
+    }, const []); // Empty dependency array means this runs once on mount
+
+    // Second useEffect: Watch for changes to selectedStackId
+    useEffect(() {
+      if (selectedStackId.value != null) {
+        loadDueCards();
+      }
       return null;
     }, [selectedStackId.value]);
 
-    void _showStackSelector(
+    // --- Function: Show Stack Selector Dialog ---
+    // Displays a dialog allowing the user to select a flashcard stack or 'All Cards'.
+    void showStackSelector(
       BuildContext context,
       WidgetRef ref,
-      ValueNotifier<String?> selectedStackId,
-      VoidCallback onStackSelected,
+      ValueNotifier<String?> selectedStackId, // Current selection state
+      VoidCallback onStackSelected, // Callback when selection changes
     ) {
+      // Watch the state of the stacks provider.
       final stacksAsync = ref.watch(stacksProvider);
       
       showDialog(
@@ -136,45 +185,54 @@ class LearnScreen extends HookConsumerWidget {
         builder: (context) => AlertDialog(
           title: const Text('Select Stack'),
           content: SizedBox(
-            width: double.maxFinite,
+            width: double.maxFinite, // Use available width
+            // Handle loading, error, and data states for stacks.
             child: stacksAsync.when(
               data: (stacks) {
+                // Build the list of stack options.
                 return ListView(
-                  shrinkWrap: true,
+                  shrinkWrap: true, // Fit content size
                   children: [
+                    // Option for 'All Cards'.
                     ListTile(
                       title: const Text('All Cards'),
-                      selected: selectedStackId.value == null,
+                      selected: selectedStackId.value == null, // Highlight if selected
                       onTap: () {
-                        selectedStackId.value = null;
-                        onStackSelected();
-                        Navigator.pop(context);
+                        selectedStackId.value = null; // Update state
+                        onStackSelected(); // Trigger callback (reloads cards)
+                        Navigator.pop(context); // Close dialog
                       },
                     ),
-                    const Divider(),
+                    const Divider(), // Separator
+                    // Generate options for each available stack.
                     ...stacks.map((stack) {
+                      // Watch flashcards to calculate count (could be optimized).
                       final flashcardsAsync = ref.watch(flashcardStateProvider);
+                      // Calculate the number of cards in this stack.
                       final dueCount = flashcardsAsync.whenOrNull(
                         data: (flashcards) => flashcards
                             .where((card) => stack.flashcardIds.contains(card.id))
                             .length,
                       ) ?? 0;
 
+                      // List tile for the specific stack.
                       return ListTile(
                         title: Text(stack.name),
                         subtitle: Text('$dueCount cards'),
-                        selected: selectedStackId.value == stack.id,
+                        selected: selectedStackId.value == stack.id, // Highlight if selected
                         onTap: () {
-                          selectedStackId.value = stack.id;
-                          onStackSelected();
-                          Navigator.pop(context);
+                          selectedStackId.value = stack.id; // Update state
+                          onStackSelected(); // Trigger callback
+                          Navigator.pop(context); // Close dialog
                         },
                       );
-                    }).toList(),
+                    }),
                   ],
                 );
               },
+              // Show loading indicator while stacks are fetched.
               loading: () => const Center(child: CircularProgressIndicator()),
+              // Show error message if stacks fail to load.
               error: (error, _) => Text('Error: $error'),
             ),
           ),
@@ -182,50 +240,60 @@ class LearnScreen extends HookConsumerWidget {
       );
     }
 
-    void _loadNextClosestCards(
-      srs_package.SRSManager srsManager,
-      ValueNotifier<List<srs_model.FlashcardItem>> dueItemsState,
-      ValueNotifier<Map<String, (srs_model.FlashcardItem, String)>> reviewedCards,
-      ValueNotifier<bool> isLoadingState,
-      ValueNotifier<bool> showLoadMoreOption
-    ) {
-      isLoadingState.value = true;
+    // --- Function: Load Next Closest Cards ---
+    // Fetches a small batch of the next upcoming (not yet due) cards 
+    // when the initial due list is empty or exhausted.
+    void loadNextClosestCards() async {
+      isLoadingState.value = true; // Indicate loading
       showLoadMoreOption.value = false; // Hide the button while loading
 
+      // Get all items from the SRS manager, sorted by their next review date.
       final allSortedItems = srsManager.getAllItemsSortedByNextReview();
+      // Get IDs of cards already reviewed in this session.
       final reviewedIds = reviewedCards.value.keys.toSet();
+      // Get IDs of cards currently in the due list.
+      final currentDueIds = Set<String>.from(dueItemsState.value.map((item) => item.id));
 
-      // Filter out cards already reviewed in this session and take the next 30
-      final nextClosestItems = allSortedItems
-          .where((item) => !reviewedIds.contains(item.id))
-          .take(30)
+      // Find the next 5 items that haven't been reviewed and aren't already in the due list.
+      final nextClosestSrsItems = allSortedItems
+          .where((item) => !reviewedIds.contains(item.id) && !currentDueIds.contains(item.id))
+          .take(5) // Limit to a small batch
           .toList();
 
-      dueItemsState.value = nextClosestItems;
-      isLoadingState.value = false;
+      // If new items were found, add them to the due list.
+      if (nextClosestSrsItems.isNotEmpty) {
+        dueItemsState.value = [...dueItemsState.value, ...nextClosestSrsItems];
+      } else {
+        // If no more upcoming items were found, hide the 'Load More' option.
+        showLoadMoreOption.value = false;
+      }
+      
+      isLoadingState.value = false; // Loading finished
     }
 
-    Widget _buildBody(
+    // --- Function: Build Body Content ---
+    // Determines what to display based on loading, error, and data states.
+    Widget buildBody(
       BuildContext context,
-      bool isLoading,
-      String? error,
-      List<srs_model.FlashcardItem> dueItems,
-      bool showEmpty,
-      ValueNotifier<String?> selectedStackId,
-      VoidCallback loadDueCards,
-      ValueNotifier<bool> isSessionComplete,
-      ValueNotifier<Map<String, (srs_model.FlashcardItem, String)>> reviewedCards,
-      ValueNotifier<List<srs_model.FlashcardItem>> dueItemsState,
-      void Function(String) updateCurrentImageUrl,
-      ValueNotifier<String?> currentImageUrl,
-      srs_package.SRSManager srsManager,
-      WidgetRef ref,
+      bool isLoading, // Current loading state
+      String? error, // Current error message
+      List<SrsItem> dueItems, // List of due SRS items
+      bool showEmpty, // Whether to show the empty state message
+      ValueNotifier<String?> selectedStackId, // Current stack selection
+      VoidCallback loadDueCards, // Callback to reload due cards
+      ValueNotifier<bool> isSessionComplete, // Session completion state
+      ValueNotifier<Map<String, (SrsItem, String)>> reviewedCards, // State for reviewed cards
+      ValueNotifier<List<SrsItem>> dueItemsState, // State for due items
+      srs_package.SRSManager srsManager, // The SRS manager instance
+      WidgetRef ref, // Reference to the widget's context
     ) {
       if (isLoading) {
+        // Show a loading indicator while data is being fetched.
         return const Center(child: CircularProgressIndicator());
       }
 
       if (error != null) {
+        // Display an error message if one occurred during loading or processing.
         return Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -243,29 +311,9 @@ class LearnScreen extends HookConsumerWidget {
         );
       }
 
-      if (showLoadMoreOption.value && dueItemsState.value.isEmpty && !isLoadingState.value) {
-        return Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text('No more cards due right now.'),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () => _loadNextClosestCards(
-                  srsManager,
-                  dueItemsState,
-                  reviewedCards,
-                  isLoadingState,
-                  showLoadMoreOption,
-                ),
-                child: const Text('Review Upcoming Cards (Max 30)'),
-              ),
-            ],
-          ),
-        );
-      }
-
       if (dueItems.isEmpty) {
+        // Display a message if there are no due cards.
+        // This could be because the session is complete or initially no cards were due.
         return Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -281,130 +329,142 @@ class LearnScreen extends HookConsumerWidget {
         );
       }
 
-      if (dueItems.isNotEmpty) {
-        updateCurrentImageUrl(dueItems.first.id);
-      }
+      // Get the list of flashcards from the provider.
+      final flashcardsData = ref.watch(flashcardStateProvider).valueOrNull ?? [];
+      // Filter the flashcards to only those that are currently in the dueItems list.
+      final dueFlashcards = dueItems
+          .map((srsItem) => flashcardsData.firstWhere(
+                (card) => card.id == srsItem.id,
+              ))
+          .where((card) => card != null)
+          .cast<Flashcard>()
+          .toList();
 
+      // Display the FlashcardView widget with the due flashcards.
+      // The key ensures the widget rebuilds when the first card changes.
       return FlashcardView(
-        flashcards: dueItems,
-        imageUrl: currentImageUrl.value,
+        key: ValueKey(dueFlashcards.isNotEmpty ? dueFlashcards[0].id : 'empty'),
+        flashcards: dueFlashcards,
+        // Callback executed when the user selects a rating ('Quick', 'Good', 'Hard').
         onRatingSelected: (rating, flashcard) async {
-          srs_outcome.ReviewOutcome outcome;
+          // Find the SRS item corresponding to the rated flashcard.
+          final srsItem = dueItems.firstWhere(
+            (item) => item.id == flashcard.id,
+          );
+          if (srsItem == null) {
+            debugPrint("Error: Couldn't find SrsItem for rated flashcard: ${flashcard.id}");
+            return;
+          }
+          // Map the UI rating ('Quick', 'Good', 'Hard') to an SRS response string ('quick', 'got_it', 'missed').
+          String response;
           switch (rating) {
-            case 'Missed':
-              outcome = srs_outcome.ReviewOutcome.hard;
+            case 'Quick':
+              response = 'quick'; 
               break;
-            case 'Got It':
-              outcome = srs_outcome.ReviewOutcome.easy;
+            case 'Good':
+              response = 'got_it';
               break;
-            case 'Lucky Guess':
-              outcome = srs_outcome.ReviewOutcome.good;
-              break;
+            case 'Hard': // Assuming 'Hard' maps to 'missed' for SRS
             default:
-              print('Unknown rating: $rating, defaulting to missed'); // Log unexpected ratings
-              outcome = srs_outcome.ReviewOutcome.good;
+              response = 'missed';
+              break;
           }
           
-          final reviewType = srs_outcome.ReviewType.typing; // Changed to valid value 'typing'
+          // Determine the review type (e.g., multiple choice, typing). Needs actual logic.
+          final reviewType = 'mc'; // Example: Replace with actual review type logic
           
+          // Record the review in the SRS manager, which calculates the next review date, etc.
           final updatedItem = srsManager.recordReview(
             flashcard.id, 
-            outcome, 
-            reviewType
+            response, // Pass the mapped response string
+            reviewType: reviewType // Use named parameter for reviewType
           );
           
+          // If the SRS manager successfully processed the review:
           if (updatedItem != null) {
+            // --- Update Flashcard State (Online Provider) ---
+            // Get the current state of online flashcards.
             final onlineFlashcardsState = ref.read(flashcardStateProvider);
             if (onlineFlashcardsState.hasValue) {
-              final cardToUpdate = onlineFlashcardsState.value!.firstWhereOrNull(
+              // Find the specific flashcard object to update.
+              final cardToUpdate = onlineFlashcardsState.value!.firstWhere(
                 (card) => card.id == flashcard.id,
               );
               
               if (cardToUpdate != null) {
+                // Create an updated flashcard object with new SRS data.
                 final updatedCard = cardToUpdate.copyWith(
-                  srsInterval: updatedItem.interval.toDouble(), // Keep?
-                  srsEaseFactor: updatedItem.personalDifficultyFactor, // Map PDF to EaseFactor
-                  srsNextReviewDate: updatedItem.nextReviewDate.millisecondsSinceEpoch,
-                  srsLastReviewDate: updatedItem.lastReviewDate?.millisecondsSinceEpoch, // Added
-                  srsBaseIntervalIndex: updatedItem.baseIntervalIndex, // Added
-                  srsQuickStreak: updatedItem.quickStreak, // Added
-                  srsIsPriority: updatedItem.isPriority, // Added
-                  srsIsInLearningPhase: updatedItem.isInLearningPhase, // Added
+                  srsInterval: updatedItem.lastInterval, 
+                  srsEaseFactor: updatedItem.pdf, // Map PDF to EaseFactor
+                  srsNextReviewDate: updatedItem.nextReview, // Use directly
+                  srsLastReviewDate: DateTime.now().millisecondsSinceEpoch,
+                  srsBaseIntervalIndex: updatedItem.baseIndex,
+                  srsQuickStreak: updatedItem.streakQuick,
+                  srsIsInLearningPhase: updatedItem.box != null,
                 );
+                // Persist the updated flashcard using the provider (handles sync + offline cache).
                 await ref.read(flashcardStateProvider.notifier).updateFlashcard(updatedCard);
               }
             }
             
-            final offlineFlashcards = ref.read(offlineFlashcardsProvider);
-            if (offlineFlashcards.value != null) {
-              final cardToUpdate = offlineFlashcards.value!.firstWhereOrNull(
-                (card) => card.id == flashcard.id,
-              );
-              
-              if (cardToUpdate != null) {
-                final updatedCard = cardToUpdate.copyWith(
-                  srsInterval: updatedItem.interval.toDouble(), // Keep?
-                  srsEaseFactor: updatedItem.personalDifficultyFactor, // Map PDF to EaseFactor
-                  srsNextReviewDate: updatedItem.nextReviewDate.millisecondsSinceEpoch,
-                  srsLastReviewDate: updatedItem.lastReviewDate?.millisecondsSinceEpoch, // Added
-                  srsBaseIntervalIndex: updatedItem.baseIntervalIndex, // Added
-                  srsQuickStreak: updatedItem.quickStreak, // Added
-                  srsIsPriority: updatedItem.isPriority, // Added
-                  srsIsInLearningPhase: updatedItem.isInLearningPhase, // Added
-                );
-                await ref.read(offlineFlashcardsProvider.notifier).updateCard(updatedCard);
-              }
-            }
-            
-            final newReviewedCards = {...reviewedCards.value};
+            // --- Update Local UI State ---
+            // Add the reviewed card and its rating to the session's reviewed list.
+            final newReviewedCards = Map<String, (SrsItem, String)>.from(reviewedCards.value);
             newReviewedCards[flashcard.id] = (updatedItem, rating);
             reviewedCards.value = newReviewedCards;
             
-            final currentDueItems = List<srs_model.FlashcardItem>.from(dueItemsState.value);
+            // Remove the reviewed card from the list of currently due items.
+            final currentDueItems = List<SrsItem>.from(dueItemsState.value);
             currentDueItems.removeWhere((item) => item.id == updatedItem.id); 
             dueItemsState.value = currentDueItems;
             
+            // Check if the due items list is now empty, signifying session completion.
             if (dueItemsState.value.isEmpty) {
               isSessionComplete.value = true;
+              // Potentially show a completion message or navigate away.
             }
           }
         },
-        showTranslation: false,
+        showTranslation: false, // Example parameter, adjust as needed
       );
     }
 
+    // Build the main screen structure using Scaffold.
     return Scaffold(
       appBar: AppBar(
         title: const Text('Review Cards'),
+        // Add actions to the AppBar.
         actions: [
+          // Button to open the stack selector dialog.
           IconButton(
-            icon: const Icon(Icons.filter_list),
+            icon: const Icon(Icons.filter_list), // Filter icon
+            tooltip: 'Select Stack', // Tooltip for accessibility
             onPressed: () {
-              _showStackSelector(
+              // Call the function to show the stack selector dialog.
+              showStackSelector(
                 context,
                 ref,
-                selectedStackId,
-                loadDueCards,
+                selectedStackId, // Pass the state notifier for selection
+                loadDueCards, // Pass the callback to reload cards on selection change
               );
             },
           ),
         ],
       ),
-      body: _buildBody(
+      // Set the body of the Scaffold to the content generated by buildBody.
+      body: buildBody(
         context,
-        isLoadingState.value,
-        errorState.value,
-        dueItemsState.value,
-        showEmptyState.value,
-        selectedStackId,
-        loadDueCards,
-        isSessionComplete,
-        reviewedCards,
-        dueItemsState,
-        updateCurrentImageUrl,
-        currentImageUrl,
-        srsManager,
-        ref,
+        isLoadingState.value, // Pass current loading state
+        errorState.value, // Pass current error state
+        dueItemsState.value, // Pass list of due items
+        showEmptyState.value, // Pass empty state flag
+        selectedStackId, // Pass selected stack state
+        loadDueCards, // Pass the load function for retry/reload
+        isSessionComplete, // Pass session completion state
+        reviewedCards, // Pass reviewed cards map
+        dueItemsState, // Pass due items list state (needed for FlashcardView key?)
+        srsManager, // Pass the SRS manager instance
+        ref, // Pass the WidgetRef
       ),
     );
   }

@@ -1,365 +1,294 @@
-import '../models/flashcard_item.dart';
-import '../models/review_outcome.dart';
+import 'dart:math';
 
-/// Implementation of the AdaptiveFlow spaced repetition algorithm.
-///
-/// This class provides methods to calculate intervals and adjust personal difficulty factors
-/// based on review outcomes, following the AdaptiveFlow SRS algorithm designed for
-/// optimal language learning with personalized adaptivity.
-class AdaptiveFlowAlgorithm {
-  /// Base intervals (in days) for the review schedule
-  static const List<int> baseIntervals = [
-    0, // Initial state (0)
-    0, // Learning phase (1) - same day, hours later
-    1, // 1 day (2)
-    3, // 3 days (3)
-    7, // 7 days (4)
-    14, // 14 days (5)
-    30, // 30 days (6)
-    60, // 60 days (7)
-    120, // 120 days (8) - maximum interval
-  ];
-  
-  /// The number of successful reviews required to graduate from learning phase
-  static const int learningPhaseRequiredReviews = 3;
-  
-  /// The default personal difficulty factor for new cards
-  static const double defaultPersonalDifficultyFactor = 1.0;
-  
-  /// The minimum allowed personal difficulty factor
-  static const double minimumPersonalDifficultyFactor = 0.5;
-  
-  /// The maximum allowed personal difficulty factor
-  static const double maximumPersonalDifficultyFactor = 2.0;
-  
-  /// The amount to decrease PDF for an "easy" response
-  static const double easyResponsePdfDecrease = 0.15;
-  
-  /// The amount to increase PDF for a "missed" response
-  static const double missedResponsePdfIncrease = 0.2;
-  
-  /// The streak bonus percentage for on-time reviews
-  static const double onTimeReviewBonus = 0.05;
-  
-  /// The streak bonus percentage for consecutive "easy" responses
-  static const double easyStreakBonus = 0.1;
-  
-  /// The minimum number of consecutive "easy" responses to trigger a streak bonus
-  static const int easyStreakThreshold = 3;
-  
-  /// The number of steps to go back in the interval sequence when an item is missed
-  static const int missedStepBack = 2;
+class SrsItem {
+  final String id;
+  int? box; // Nullable indicates long-term
+  double pdf;
+  int baseIndex;
+  int nextReview; // Epoch seconds
+  double lastInterval; // Seconds
+  int streakQuick;
+  int timesSeenToday;
+  String lastSeenDay; // YYYY-MM-DD UTC
 
-  /// Modifiers applied to the interval based on review type difficulty
-  static const Map<ReviewType, double> reviewTypeModifiers = {
-    ReviewType.multipleChoice: 0.9, // Easier, slightly shorter interval
-    ReviewType.listening: 1.0,      // Standard interval
-    ReviewType.typing: 1.1,         // Harder, slightly longer interval
-  };
+  SrsItem({
+    required this.id,
+    this.box,
+    required this.pdf,
+    required this.baseIndex,
+    required this.nextReview,
+    required this.lastInterval,
+    required this.streakQuick,
+    required this.timesSeenToday,
+    required this.lastSeenDay,
+  });
 
-  /// Updates a flashcard's SRS parameters based on the review outcome and type.
-  ///
-  /// This method implements the core AdaptiveFlow algorithm logic:
-  /// - For learning phase cards: progress through initial learning
-  /// - For review phase cards: adjust interval and PDF based on performance
-  ///
-  /// Returns the updated flashcard item.
-  FlashcardItem processReview(
-    FlashcardItem item, 
-    ReviewOutcome outcome, 
-    ReviewType reviewType
-  ) {
-    // Increment the review count
-    int newReviews = item.reviews + 1;
-    
-    // Handle learning phase differently
-    if (item.isInLearningPhase) {
-      return _processLearningPhaseReview(item, outcome, reviewType, newReviews);
-    }
-    
-    // For graduated cards, process according to the main algorithm
-    return _processGraduatedReview(item, outcome, reviewType, newReviews);
+  // Consider adding methods for serialization/deserialization if needed
+  // e.g., toJson(), fromJson()
+}
+
+
+class SRS {
+  Map<String, SrsItem> items = {};
+
+  // ───── CONFIG (seconds) ─────
+  final List<int> boxWait;
+  final List<int> baseSteps;
+  final int maxCap;
+  final Map<String, double> typeMod;
+  final int dailyLimit;
+  final int coolHour; // UTC Hour
+  final int loadWindow; // Seconds
+  final int loadScale;
+  final double loadSlope;
+
+  SRS({
+    List<int>? boxWait,
+    List<int>? baseSteps,
+    int? maxCap,
+    Map<String, double>? typeMod,
+    int? dailyLimit,
+    int? coolHour,
+    int? loadWindow,
+    int? loadScale,
+    double? loadSlope,
+  }) : boxWait =
+           boxWait ?? [30, 120, 600, 3600, 86400, 259200, 604800], // 7 boxes
+       baseSteps =
+           baseSteps ??
+           [
+             3600, // 1h
+             28800, // 8h
+             86400, // 1d
+             172800, // 2d
+             345600, // 4d
+             604800, // 7d
+             1209600, // 14d
+             2592000, // 30d
+             5184000, // 60d
+             10368000, // 120d
+           ],
+       maxCap = maxCap ?? 10368000, // 120 d
+       typeMod = typeMod ?? {'mc': 0.9, 'typing': 1.1, 'listening': 1.0},
+       dailyLimit = dailyLimit ?? 7,
+       coolHour = coolHour ?? 9, // 09:00 UTC next day
+       loadWindow = loadWindow ?? 14400, // 4 h
+       loadScale = loadScale ?? 50, // cards
+       loadSlope = loadSlope ?? 0.25 { // coefficient in log10 formula
+    // Validate config if necessary
+    assert(this.boxWait.isNotEmpty, "boxWait cannot be empty");
+    assert(this.baseSteps.isNotEmpty, "baseSteps cannot be empty");
   }
-  
-  /// Processes a review for a card in the learning phase
-  FlashcardItem _processLearningPhaseReview(
-    FlashcardItem item, 
-    ReviewOutcome outcome, 
-    ReviewType reviewType,
-    int newReviews
-  ) {
-    // Update the last review type
-    String newLastReviewType = reviewType.asString;
-    
-    // For missed responses in learning phase
-    if (outcome == ReviewOutcome.missed) {
-      // Reset learning progress (but not completely to 0 to avoid frustration)
-      int newLearningProgress = item.learningPhaseProgress > 0 
-          ? item.learningPhaseProgress - 1 
-          : 0;
-      
-      // Schedule for review in 30 minutes
-      final DateTime newNextReviewDate = DateTime.now().add(Duration(minutes: 30));
-      
-      return item.copyWith(
-        reviews: newReviews,
-        learningPhaseProgress: newLearningProgress,
-        nextReviewDate: newNextReviewDate,
-        lastReviewType: newLastReviewType,
-        repeatedToday: item.repeatedToday + 1,
-        isPriority: true, // Mark as priority to ensure it appears early in next session
-      );
+
+  // ───────── utilities ─────────
+  T clamp<T extends num>(T v, T minVal, T maxVal) =>
+      max(minVal, min(maxVal, v));
+  int now() => DateTime.now().millisecondsSinceEpoch ~/ 1000; // Seconds
+  String utcDateStr(int epochSeconds) => DateTime.fromMillisecondsSinceEpoch(
+    epochSeconds * 1000,
+    isUtc: true,
+  ).toIso8601String().substring(0, 10); // YYYY-MM-DD
+
+  // ───────── PUBLIC API ─────────
+  SrsItem addItem(String id, {int? now}) {
+    if (items.containsKey(id)) {
+      throw ArgumentError("Item '$id' already exists");
     }
-    
-    // For hard responses in learning phase
-    if (outcome == ReviewOutcome.hard) {
-      // Keep learning progress the same
-      int newLearningProgress = item.learningPhaseProgress;
-      
-      // Schedule for review in 1 hour
-      final DateTime newNextReviewDate = DateTime.now().add(Duration(hours: 1));
-      
-      return item.copyWith(
-        reviews: newReviews,
-        learningPhaseProgress: newLearningProgress,
-        nextReviewDate: newNextReviewDate,
-        lastReviewType: newLastReviewType,
-        repeatedToday: item.repeatedToday + 1,
-        isPriority: true, // Mark as priority but less urgent than missed
-      );
-    }
-    
-    // For successful responses (good or easy)
-    int newLearningProgress = item.learningPhaseProgress + 1;
-    
-    // Check if we've completed the required number of successful reviews to graduate
-    bool shouldGraduate = newLearningProgress >= learningPhaseRequiredReviews;
-    
-    DateTime newNextReviewDate;
-    if (shouldGraduate) {
-      // Graduate to review phase: first review after 1 day
-      // (or 2 days for "easy" responses)
-      int graduationInterval = outcome == ReviewOutcome.easy ? 2 : 1;
-      newNextReviewDate = DateTime.now().add(Duration(days: graduationInterval));
-    } else {
-      // Still in learning phase: next review after 4 hours
-      // (or 8 hours for "easy" responses)
-      int learningHours = outcome == ReviewOutcome.easy ? 8 : 4;
-      newNextReviewDate = DateTime.now().add(Duration(hours: learningHours));
-    }
-    
-    return item.copyWith(
-      reviews: newReviews,
-      learningPhaseProgress: newLearningProgress,
-      isInLearningPhase: !shouldGraduate,
-      interval: shouldGraduate ? (outcome == ReviewOutcome.easy ? 2 : 1) : 0,
-      nextReviewDate: newNextReviewDate,
-      lastReviewType: newLastReviewType,
-      repeatedToday: 0,
+    final currentTime = now ?? this.now();
+    final newItem = SrsItem(
+      id: id,
+      box: 0, // Start in the first Leitner box
+      pdf: 1.0,
+      baseIndex: 0, // Not used until graduation
+      nextReview: currentTime + boxWait[0],
+      lastInterval: boxWait[0].toDouble(),
+      streakQuick: 0,
+      timesSeenToday: 0,
+      lastSeenDay: utcDateStr(currentTime),
     );
+    items[id] = newItem;
+    return newItem;
   }
-  
-  /// Processes a review for a graduated card (in review phase)
-  FlashcardItem _processGraduatedReview(
-    FlashcardItem item, 
-    ReviewOutcome outcome, 
-    ReviewType reviewType,
-    int newReviews
-  ) {
-    final now = DateTime.now();
-    double currentPdf = item.personalDifficultyFactor;
-    int currentBaseIndex = item.baseIntervalIndex;
-    int currentQuickStreak = item.quickStreak;
-    int nextBaseIndex = currentBaseIndex;
-    double pdfDelta = 0.0;
-    double bonusMultiplier = 1.0;
-    bool setPriority = false;
 
-    // 1. Handle Missed Outcome
-    if (outcome == ReviewOutcome.missed || outcome == ReviewOutcome.hard) {
-      // Increase PDF
-      pdfDelta = missedResponsePdfIncrease;
-      // Step back in interval sequence
-      nextBaseIndex = (currentBaseIndex - missedStepBack).clamp(1, baseIntervals.length - 1); // Clamp ensures we don't go below index 1
-      // Set priority flag
-      setPriority = true;
-      // Reset quick streak
-      currentQuickStreak = 0;
+  List<SrsItem> dueItems({int? now}) {
+    final currentTime = now ?? this.now();
+    return items.values.where((i) => i.nextReview <= currentTime).toList();
+  }
+
+  SrsItem? getItem(String id) {
+    // Return a copy to prevent accidental modification? Dart objects are references.
+    // For this app's structure it might be fine, but be aware.
+    return items[id];
+  }
+
+  SrsItem processAnswer(
+    String id,
+    String resp, { // e.g., 'quick', 'got', 'missed'
+    String reviewType = 'mc',
+    int? now,
+  }) {
+    final itm = items[id];
+    if (itm == null) {
+      throw ArgumentError("Item '$id' not found");
+    }
+    final currentTime = now ?? this.now();
+
+    // Apply daily limit *before* processing, affects timesSeenToday count
+    _updateDailyCount(itm, currentTime);
+
+    // Process based on current stage (Leitner box or long-term)
+    if (itm.box != null) {
+      _handleLeitner(itm, resp, currentTime);
     } else {
-      // 2. Handle Correct Outcomes (Easy/Good)
-      setPriority = false; // Clear priority flag on correct review
-
-      if (outcome == ReviewOutcome.easy) {
-        // Decrease PDF
-        pdfDelta = -easyResponsePdfDecrease;
-        // Increment quick streak
-        currentQuickStreak++;
-        // Advance interval sequence
-        nextBaseIndex = (currentBaseIndex + 1).clamp(1, baseIntervals.length - 1);
-      } else { // ReviewOutcome.good
-        // No PDF change for 'good'
-        pdfDelta = 0.0;
-        // Reset quick streak for 'good'
-        currentQuickStreak = 0;
-        // Advance interval sequence
-        nextBaseIndex = (currentBaseIndex + 1).clamp(1, baseIntervals.length - 1);
-      }
-
-      // 3. Apply Bonuses (only for correct outcomes)
-      // On-time bonus (review done within ~20% tolerance of interval)
-      if (item.lastReviewDate != null) {
-          final expectedReviewDate = item.lastReviewDate!.add(Duration(days: item.interval));
-          final daysLate = now.difference(expectedReviewDate).inDays;
-          // Allow some flexibility (e.g., reviewed within 20% of the interval duration past the due date)
-          if (daysLate.abs() <= (item.interval * 0.2).ceil()) {
-              bonusMultiplier += onTimeReviewBonus;
-          }
-      }
-
-      // Easy streak bonus
-      if (currentQuickStreak >= easyStreakThreshold) {
-        bonusMultiplier += easyStreakBonus;
-      }
+      _handleLongTerm(itm, resp, reviewType, currentTime);
     }
 
-    // 4. Adjust PDF
-    double newPdf = _adjustPdf(currentPdf, pdfDelta);
+    // Apply cool-down *after* scheduling if limit reached
+    _applyCoolDownIfNeeded(itm, currentTime);
+    return itm;
+  }
 
-    // 5. Calculate Next Interval Duration
-    double baseIntervalDays = baseIntervals[nextBaseIndex].toDouble();
-    double reviewModifier = reviewTypeModifiers[reviewType] ?? 1.0;
-    double calculatedIntervalDays = baseIntervalDays * newPdf * reviewModifier * bonusMultiplier;
+  // ───────── private: 7‑box Leitner ─────────
+  void _handleLeitner(SrsItem itm, String resp, int now) {
+    final bool correct = (resp == 'quick' || resp == 'got');
 
-    // Apply max interval cap (convert days to int, ensure minimum 1 day if not index 1 which is hours)
-    int newIntervalDays = calculatedIntervalDays.round().clamp(nextBaseIndex == 1 ? 0 : 1, baseIntervals.last);
-    if (nextBaseIndex == 1 && newIntervalDays == 0) { // Special case for first step (hours)
-       // Calculate in hours based on PDF/modifiers if base is 0 days
-       // Example: Base interval 1 is 'same day, hours later'. Let's target ~4 hours base.
-       calculatedIntervalDays = (4 / 24.0) * newPdf * reviewModifier * bonusMultiplier; 
-       // Still store 0 in interval field, but use hours for nextReviewDate
-       newIntervalDays = 0; 
+    if (correct) {
+      final int hop = (resp == 'quick') ? 2 : 1; // quick ⇒ double promotion
+      int nextBox = itm.box! + hop;
+
+      // Graduation check
+      if (nextBox >= boxWait.length) {
+         itm.box = null; // Switch to long-term
+         itm.baseIndex = 0; // Start at the first base step
+         final double interval = baseSteps[0] * itm.pdf; // Initial long-term interval
+         itm.lastInterval = interval;
+         itm.nextReview = now + interval.round();
+         itm.streakQuick = 0; // Reset streak on graduation
+         return; // Don't schedule Leitner wait
+      } else {
+        itm.box = nextBox;
+      }
     } else {
-        // If calculated interval forces index beyond max, use max interval index
-        if (newIntervalDays >= baseIntervals.last) {
-            nextBaseIndex = baseIntervals.length - 1;
-            newIntervalDays = baseIntervals.last;
-        }
+      // Miss ⇒ demote once (not below 0)
+      itm.box = clamp(itm.box! - 1, 0, boxWait.length - 1);
+    }
+
+    // Schedule next wait inside session using the *new* box index
+    final int wait = boxWait[itm.box!];
+    itm.lastInterval = wait.toDouble(); // Store the Leitner wait as last interval
+    itm.nextReview = now + wait;
+  }
+
+
+  // ───────── private: AdaptiveFlow long‑term ─────────
+  void _handleLongTerm(SrsItem itm, String resp, String reviewType, int now) {
+    final double typeM = typeMod[reviewType] ?? 1.0;
+    final bool correct = (resp == 'quick' || resp == 'got');
+
+    // 1️⃣ PDF adjust
+    if (resp == 'quick') {
+      itm.pdf = clamp(itm.pdf + 0.15, 0.5, 2.0);
+      itm.streakQuick += 1;
+    } else if (resp == 'missed') {
+      itm.pdf = clamp(itm.pdf - 0.20, 0.5, 2.0);
+      itm.streakQuick = 0; // Reset streak on miss
+    } else { // 'got'
+      // PDF doesn't change explicitly for 'got', but streak resets
+      itm.streakQuick = 0;
+    }
+
+    // 2️⃣ Ladder index movement
+    if (correct) {
+      itm.baseIndex = clamp(itm.baseIndex + 1, 0, baseSteps.length - 1);
+    } else { // missed
+      itm.baseIndex = clamp(itm.baseIndex - 2, 0, baseSteps.length - 1); // Go back 2 steps, floor 0
+    }
+
+    // 3️⃣ Compute raw interval
+    double interval = baseSteps[itm.baseIndex] * itm.pdf * typeM;
+
+    // 4️⃣ Apply bonuses/modifiers
+
+    // On-time bonus (allow lateness up to lastInterval)
+    // Only apply if it was actually due (now >= itm.nextReview)
+    if (now >= itm.nextReview && (now - itm.nextReview <= itm.lastInterval)) {
+        interval *= 1.05;
+    }
+
+    // Streak bonus (apply *after* on-time bonus, only if correct)
+    // Apply every 3 *consecutive* quick answers
+    if (correct && itm.streakQuick > 0 && itm.streakQuick % 3 == 0) {
+        interval *= 1.10;
     }
 
 
-    // 6. Calculate Next Review Date
-    Duration nextDuration;
-    if (nextBaseIndex == 1 && newIntervalDays == 0) { // Use hours for index 1
-         int hours = (calculatedIntervalDays * 24).round().clamp(1, 12); // Clamp hours e.g. 1-12h
-         nextDuration = Duration(hours: hours);
-    } else if (outcome == ReviewOutcome.missed || outcome == ReviewOutcome.hard) {
-        // For missed/hard, schedule relative to NOW, e.g., 10-30 minutes for immediate re-review
-         nextDuration = Duration(minutes: 30); // Review again soon
-         setPriority = true; // Ensure priority remains set
-         // Keep nextBaseIndex stepped back, but force immediate review
-    } else {
-        nextDuration = Duration(days: newIntervalDays);
-    }
-    DateTime newNextReviewDate = now.add(nextDuration);
+    // 5️⃣ Load‑aware stretch
+    interval *= _loadFactor(now);
 
-    // 7. Update Item
-    return item.copyWith(
-      interval: newIntervalDays, // Store calculated interval days
-      baseIntervalIndex: nextBaseIndex,
-      personalDifficultyFactor: newPdf,
-      reviews: newReviews,
-      lastReviewDate: now, // Update last review date
-      nextReviewDate: newNextReviewDate,
-      quickStreak: currentQuickStreak,
-      lastReviewType: reviewType.asString,
-      isPriority: setPriority,
-      repeatedToday: (outcome == ReviewOutcome.missed || outcome == ReviewOutcome.hard) ? item.repeatedToday + 1 : 0, // Reset counter on correct
-    );
+    // 6️⃣ Caps - Apply soft cap first, then hard cap
+    // Soft cap: prevent interval from more than doubling (2.5x factor used here)
+    interval = min(interval, itm.lastInterval * 2.5);
+    // Hard cap: absolute maximum interval
+    interval = min(interval, maxCap.toDouble());
+
+    // Ensure minimum interval (e.g., prevent 0 or negative interval after penalties)
+    // Use the first base step scaled by min PDF as a reasonable minimum? Or just 1 hour?
+    interval = max(interval, 3600.0); // Minimum 1 hour interval
+
+    itm.lastInterval = interval;
+    itm.nextReview = now + interval.round();
   }
 
-  /// Adjusts the personal difficulty factor by the given delta, ensuring it stays within bounds
-  double _adjustPdf(double currentPdf, double delta) {
-    double newPdf = currentPdf + delta;
-    
-    if (newPdf < minimumPersonalDifficultyFactor) {
-      return minimumPersonalDifficultyFactor;
-    }
-    
-    if (newPdf > maximumPersonalDifficultyFactor) {
-      return maximumPersonalDifficultyFactor;
-    }
-    
-    return newPdf;
+  // ───────── private: load factor ─────────
+  double _loadFactor(int now) {
+    // Consider only items in the long-term phase for load calculation?
+    // Or all items? Let's stick to all items for now as in the original code.
+    final int dueNow = items.values.where((i) => i.nextReview <= now).length;
+    final int dueSoon = items.values.where(
+      (i) => i.nextReview > now && i.nextReview <= now + loadWindow,
+    ).length;
+    final int load = dueNow + dueSoon;
+
+    // Avoid log(0) or negative results if load is very small
+    if (load <= 0) return 1.0;
+
+    // Calculate factor: 1 + slope * log10(1 + load / scale)
+    // dart:math log is natural log (ln), so use log(x) / ln10 for log10(x)
+    double factor = 1 + loadSlope * (log(1 + load / loadScale) / ln10);
+
+    // Clamp factor to prevent excessive stretching (e.g., max 2x stretch)
+    return clamp(factor, 1.0, 2.0);
   }
-  
-  /// Determines the optimal review type for a flashcard based on its difficulty
-  ReviewType getOptimalReviewType(FlashcardItem item) {
-    // Higher PDF (harder cards) should use typing more often
-    if (item.personalDifficultyFactor > 1.5) {
-      return ReviewType.typing;
+
+   // ───────── private: daily cap / cool‑down ─────────
+
+  // Separated steps for clarity: update count, then apply cool-down if needed.
+  void _updateDailyCount(SrsItem itm, int now) {
+    final String today = utcDateStr(now);
+    if (itm.lastSeenDay != today) {
+      itm.lastSeenDay = today;
+      itm.timesSeenToday = 0; // Reset count for the new day
     }
-    
-    // Medium difficulty cards should use a mix, with listening being common
-    if (item.personalDifficultyFactor > 0.8) {
-      // Avoid using the same review type twice in a row if possible
-      if (item.lastReviewType == ReviewType.listening.asString) {
-        return ReviewType.typing;
-      }
-      return ReviewType.listening;
+    itm.timesSeenToday++; // Increment count for this interaction
+  }
+
+  void _applyCoolDownIfNeeded(SrsItem itm, int now) {
+     if (itm.timesSeenToday >= dailyLimit) {
+      // Calculate the start of the *next* UTC day at coolHour
+      final currentUtc = DateTime.fromMillisecondsSinceEpoch(now * 1000, isUtc: true);
+      final tomorrowUtc = DateTime.utc(
+          currentUtc.year,
+          currentUtc.month,
+          currentUtc.day + 1, // Move to the next day
+          coolHour, // Set to the cool-down hour
+          0, 0, 0 // Zero out minutes, seconds, ms
+      );
+      final int targetEpoch = tomorrowUtc.millisecondsSinceEpoch ~/ 1000;
+
+      // Push the review time to at least the cool-down time tomorrow.
+      // If the calculated nextReview was already later, keep the later time.
+      itm.nextReview = max(itm.nextReview, targetEpoch);
     }
-    
-    // Easier cards can use multiple choice more often
-    // Avoid using the same review type twice in a row if possible
-    if (item.lastReviewType == ReviewType.multipleChoice.asString) {
-      return ReviewType.listening;
-    }
-    return ReviewType.multipleChoice;
   }
-  
-  /// Suggests an optimal daily review session length based on due items
-  int suggestSessionLength(List<FlashcardItem> dueItems) {
-    // Base suggestion on number of due items with some constraints
-    int baseLength = dueItems.length;
-    
-    // Count priority items (they need more attention)
-    int priorityItems = dueItems.where((item) => item.isPriority).length;
-    
-    // Add extra time for priority items
-    int suggestedLength = baseLength + priorityItems;
-    
-    // Cap at reasonable limits
-    if (suggestedLength < 5) return 5; // Minimum session length
-    if (suggestedLength > 30) return 30; // Maximum session length
-    
-    return suggestedLength;
-  }
-  
-  /// Prioritizes flashcards for review based on various factors
-  List<FlashcardItem> prioritizeReviews(List<FlashcardItem> dueItems) {
-    // Sort by multiple factors:
-    // 1. Priority flag (true comes first)
-    // 2. Learning phase items (true comes first)
-    // 3. Overdue items (earlier due date comes first)
-    // 4. Higher PDF (harder items come first)
-    return List.from(dueItems)..sort((a, b) {
-      // Priority flag comparison (true comes first)
-      if (a.isPriority != b.isPriority) {
-        return a.isPriority ? -1 : 1;
-      }
-      
-      // Learning phase comparison (learning phase items come first)
-      if (a.isInLearningPhase != b.isInLearningPhase) {
-        return a.isInLearningPhase ? -1 : 1;
-      }
-      
-      // Due date comparison (earlier comes first)
-      int dateComparison = a.nextReviewDate.compareTo(b.nextReviewDate);
-      if (dateComparison != 0) {
-        return dateComparison;
-      }
-      
-      // PDF comparison (higher PDF comes first)
-      return b.personalDifficultyFactor.compareTo(a.personalDifficultyFactor);
-    });
-  }
+
 }

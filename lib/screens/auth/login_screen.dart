@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../services/auth_service.dart';
+// import '../../services/auth_service.dart'; // REMOVE - Accessed via provider
 import 'signup_screen.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // Keep for exception handling
 import '../../services/keep_signed_in_service.dart';
-import '../../providers/firebase_provider.dart'; // Exports firebaseServiceProvider
-
-final authServiceProvider = Provider((ref) => AuthService(ref.watch(firebaseServiceProvider)));
+import '../../providers/auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});

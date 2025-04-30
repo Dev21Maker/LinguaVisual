@@ -1,153 +1,108 @@
 import 'algorithm/adaptive_flow_algorithm.dart';
-import 'models/flashcard_item.dart';
-import 'models/review_outcome.dart';
+import '../models/flashcard.dart';
 
-/// Main manager class for the AdaptiveFlow spaced repetition system.
+/// Main manager class for the SRS (Spaced Repetition System).
 ///
-/// This class provides the core functionality for managing flashcard items
-/// and scheduling reviews using the AdaptiveFlow algorithm.
+/// This class provides an interface to the underlying SRS algorithm,
+/// managing the state and scheduling of SrsItems.
 class SRSManager {
-  /// Internal list of flashcard items.
-  final List<FlashcardItem> _items = [];
-  
-  /// The algorithm implementation used for spaced repetition calculations.
-  final AdaptiveFlowAlgorithm _algorithm = AdaptiveFlowAlgorithm();
+  /// The core SRS algorithm implementation and state.
+  final SRS _srs;
 
-  /// Returns a list of all flashcard items.
-  List<FlashcardItem> get items => List.unmodifiable(_items);
+  /// Creates an SRSManager, optionally with custom SRS configuration.
+  SRSManager({SRS? srs}) : _srs = srs ?? SRS();
 
-  /// Adds a new flashcard item to the system.
+  /// Adds a new item to the SRS system.
   ///
-  /// If an item with the same ID already exists, it will be replaced.
-  void addItem(FlashcardItem item) {
-    // Check if an item with this ID already exists
-    final existingIndex = _items.indexWhere((i) => i.id == item.id);
-    
-    if (existingIndex >= 0) {
-      // Replace existing item
-      _items[existingIndex] = item;
-    } else {
-      // Add new item
-      _items.add(item);
-    }
+  /// Throws an ArgumentError if an item with the same ID already exists.
+  /// Returns the newly created SrsItem.
+  SrsItem addItem(String itemId, {int? now}) {
+    return _srs.addItem(itemId, now: now);
   }
 
-  /// Records a review for the specified flashcard item.
+  /// Loads or updates an item in the SRS system based on Flashcard data.
   ///
-  /// Updates the item's SRS fields based on the review outcome and type.
+  /// This is used to populate the manager with existing items and their progress.
+  SrsItem loadOrUpdateItemFromFlashcard(Flashcard card) {
+    final existingItem = _srs.items[card.id];
+
+    // Create SrsItem state from Flashcard data
+    final srsItem = SrsItem(
+        id: card.id,
+        // If Flashcard is in learning phase, use its baseIndex as the Leitner box number.
+        // Otherwise (graduated), box is null.
+        box: card.srsIsInLearningPhase ? card.srsBaseIntervalIndex : null,
+        pdf: card.srsEaseFactor, // Maps directly
+        // BaseIndex in SrsItem tracks the long-term interval step.
+        // Use the value from Flashcard directly.
+        baseIndex: card.srsBaseIntervalIndex,
+        nextReview: card.srsNextReviewDate, // Assumes epoch seconds
+        lastInterval: card.srsInterval, // Assumes seconds
+        streakQuick: card.srsQuickStreak, // Maps directly
+        // Preserve session-specific state if item already exists in manager
+        timesSeenToday: existingItem?.timesSeenToday ?? 0,
+        // Use internal helper to get current date string if item is new this session
+        lastSeenDay: existingItem?.lastSeenDay ?? _srs.utcDateStr(_srs.now()),
+    );
+
+    _srs.items[card.id] = srsItem; // Add or replace in the internal map
+    return srsItem;
+  }
+
+  /// Records a review for the specified item.
   ///
-  /// Returns the updated flashcard item, or null if no item with the given ID was found.
-  FlashcardItem? recordReview(String itemId, ReviewOutcome outcome, ReviewType reviewType) {
-    // Find the item with the given ID
-    final index = _items.indexWhere((item) => item.id == itemId);
-    
-    if (index < 0) {
-      // Item not found
+  /// Updates the item's SRS state based on the response ('quick', 'got', 'missed')
+  /// and the review type ('mc', 'typing', 'listening').
+  ///
+  /// Returns the updated SrsItem, or null if no item with the given ID was found.
+  SrsItem? recordReview(String itemId, String response, {String reviewType = 'mc', int? now}) {
+    try {
+      // Basic validation for response string
+      if (!['quick', 'got', 'missed'].contains(response)) {
+        print("Warning: Invalid response '$response' passed to recordReview.");
+        // Decide how to handle invalid input: return null, throw, or default?
+        // For now, let's let the SRS class handle potential typeMod errors if reviewType is bad.
+      }
+      return _srs.processAnswer(itemId, response, reviewType: reviewType, now: now);
+    } catch (e) {
+      // Catch potential ArgumentError if item not found
+      print("Error recording review for item '$itemId': $e");
       return null;
     }
-    
-    // Get the current item
-    final item = _items[index];
-    
-    // Process the review using the AdaptiveFlow algorithm
-    final updatedItem = _algorithm.processReview(item, outcome, reviewType);
-    
-    // Update the item in the list
-    _items[index] = updatedItem;
-    
-    return updatedItem;
   }
 
-  /// Returns a list of flashcard items that are due for review.
+  /// Returns a list of SrsItems that are due for review as of the current time.
   ///
-  /// An item is considered due if its nextReviewDate is on or before the given date.
-  /// If languageId is provided, only items for that language will be returned.
-  /// Results are prioritized according to the AdaptiveFlow algorithm.
-  List<FlashcardItem> getDueItems(DateTime currentDate, {String? languageId}) {
-    final dueItems = _items.where((item) {
-      // Check if the item is due
-      final isDue = !item.nextReviewDate.isAfter(currentDate);
-      
-      // If languageId is provided, also check if the item belongs to that language
-      final isCorrectLanguage = languageId == null || item.languageId == languageId;
-      
-      return isDue && isCorrectLanguage;
-    }).toList();
-    
-    // Prioritize items according to the algorithm
-    return _algorithm.prioritizeReviews(dueItems);
+  /// Filtering by other criteria (like language) should happen outside this manager.
+  List<SrsItem> getDueItems({int? now}) {
+    return _srs.dueItems(now: now);
+    // Note: Prioritization logic from the old algorithm is removed.
+    // The new SRS class doesn't expose a separate prioritization method.
+    // If prioritization is needed, it should be implemented here or in the calling code,
+    // potentially based on SrsItem properties (e.g., nextReview, pdf).
   }
 
-  /// Returns a list of all flashcard items, sorted by their next review date (ascending).
-  List<FlashcardItem> getAllItemsSortedByNextReview() {
-    final sortedItems = List<FlashcardItem>.from(_items);
-    sortedItems.sort((a, b) => a.nextReviewDate.compareTo(b.nextReviewDate));
+  /// Returns the SrsItem for the given ID, or null if not found.
+  SrsItem? getItem(String itemId) {
+    return _srs.getItem(itemId);
+  }
+
+  /// Returns a list of all SrsItems, sorted by their next review date (ascending).
+  List<SrsItem> getAllItemsSortedByNextReview() {
+    final sortedItems = List<SrsItem>.from(_srs.items.values);
+    sortedItems.sort((a, b) => a.nextReview.compareTo(b.nextReview));
     return sortedItems;
   }
 
-  /// Removes a flashcard item from the system.
+  /// Removes an item from the SRS system.
   ///
   /// Returns true if an item was removed, false if no item with the given ID was found.
   bool removeItem(String itemId) {
-    final initialLength = _items.length;
-    _items.removeWhere((item) => item.id == itemId);
-    return _items.length < initialLength;
+    return _srs.items.remove(itemId) != null;
   }
 
-  /// Updates an existing flashcard item.
-  ///
-  /// Returns the updated item, or null if no item with the given ID was found.
-  FlashcardItem? updateItem(FlashcardItem updatedItem) {
-    final index = _items.indexWhere((item) => item.id == updatedItem.id);
-    
-    if (index < 0) {
-      // Item not found
-      return null;
-    }
-    
-    // Update the item in the list
-    _items[index] = updatedItem;
-    
-    return updatedItem;
-  }
-
-  /// Clears all flashcard items from the system.
+  /// Clears all items from the SRS system.
   void clear() {
-    _items.clear();
-  }
-  
-  /// Suggests an optimal review type for a flashcard based on its difficulty.
-  ///
-  /// This helps implement the smart review mixing feature of AdaptiveFlow.
-  ReviewType suggestReviewType(FlashcardItem item) {
-    return _algorithm.getOptimalReviewType(item);
-  }
-  
-  /// Suggests an optimal daily review session length based on due items.
-  ///
-  /// This helps implement the adaptive session length feature of AdaptiveFlow.
-  int suggestSessionLength() {
-    final dueItems = getDueItems(DateTime.now());
-    return _algorithm.suggestSessionLength(dueItems);
-  }
-  
-  /// Returns the number of items in the learning phase.
-  int getLearningPhaseItemCount() {
-    return _items.where((item) => item.isInLearningPhase).length;
-  }
-  
-  /// Returns the number of priority items (items that were recently missed).
-  int getPriorityItemCount() {
-    return _items.where((item) => item.isPriority).length;
-  }
-  
-  /// Returns the average personal difficulty factor across all items.
-  ///
-  /// This can be used as a measure of overall learning progress.
-  double getAveragePersonalDifficultyFactor() {
-    if (_items.isEmpty) return 1.0;
-    
-    double sum = _items.fold(0.0, (sum, item) => sum + item.personalDifficultyFactor);
-    return sum / _items.length;
+    _srs.items.clear();
   }
 }

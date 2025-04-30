@@ -1,17 +1,25 @@
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/offline_flashcard.dart';
 
 class OfflineFlashcardsNotifier extends StateNotifier<AsyncValue<List<OfflineFlashcard>>> {
-  OfflineFlashcardsNotifier() : super(const AsyncValue.loading()) {
+  final String? userId;
+
+  OfflineFlashcardsNotifier(this.userId) : super(const AsyncValue.loading()) {
     _loadFlashcards();
   }
 
   Future<void> _loadFlashcards() async {
+    if (userId == null) {
+      state = const AsyncValue.data([]);
+      return;
+    }
     try {
       final prefs = await SharedPreferences.getInstance();
-      final flashcardsJson = prefs.getStringList('offline_flashcards') ?? [];
+      final key = 'offline_flashcards_$userId';
+      final flashcardsJson = prefs.getStringList(key) ?? [];
       final cards = flashcardsJson
           .map((json) => OfflineFlashcard.fromMap(jsonDecode(json)))
           .toList();
@@ -28,12 +36,14 @@ class OfflineFlashcardsNotifier extends StateNotifier<AsyncValue<List<OfflineFla
   }
 
   Future<void> _saveFlashcards() async {
+    if (userId == null) return;
     final prefs = await SharedPreferences.getInstance();
     final current = state.value ?? [];
     final flashcardsJson = current
         .map((flashcard) => jsonEncode(flashcard.toMap()))
         .toList();
-    await prefs.setStringList('offline_flashcards', flashcardsJson);
+    final key = 'offline_flashcards_$userId';
+    await prefs.setStringList(key, flashcardsJson);
   }
 
   Future<void> removeFlashcard(String id) async {
@@ -49,8 +59,17 @@ class OfflineFlashcardsNotifier extends StateNotifier<AsyncValue<List<OfflineFla
     ).toList());
     await _saveFlashcards();
   }
+
+  Future<void> clearOfflineData() async {
+    if (userId == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'offline_flashcards_$userId';
+    await prefs.remove(key);
+    state = const AsyncValue.data([]);
+  }
 }
 
 final offlineFlashcardsProvider = StateNotifierProvider<OfflineFlashcardsNotifier, AsyncValue<List<OfflineFlashcard>>>((ref) {
-  return OfflineFlashcardsNotifier();
+  final userId = FirebaseAuth.instance.currentUser?.uid;
+  return OfflineFlashcardsNotifier(userId);
 });

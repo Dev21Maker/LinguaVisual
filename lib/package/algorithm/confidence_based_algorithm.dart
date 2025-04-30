@@ -39,9 +39,9 @@ class ConfidenceBasedAlgorithm {
   /// Updates a flashcard's SRS parameters based on the review outcome and confidence level.
   ///
   /// This method implements the confidence-based algorithm logic:
-  /// - For wrong answers: Shrink interval heavily, decrease ease, schedule soon, repeat today
-  /// - For hard answers: Shrink interval slightly, decrease ease slightly, later today
-  /// - For good/easy answers: Grow interval, increase ease, future days
+  /// - For hard answers: Shrink interval heavily, decrease ease, schedule soon, repeat today
+  /// - For good answers: Shrink interval slightly, decrease ease slightly, later today
+  /// - For easy answers: Grow interval, increase ease, future days
   ///
   /// Returns the updated flashcard item.
   FlashcardItem processReview(
@@ -59,7 +59,7 @@ class ConfidenceBasedAlgorithm {
     bool shouldRepeatToday;
     
     switch (outcome) {
-      case ReviewOutcome.missed:
+      case ReviewOutcome.hard:
         // Wrong answer - difficult card
         newInterval = (item.interval * wrongIntervalFactor).round();
         if (newInterval < 1) newInterval = 1; // Ensure minimum interval of 1 day
@@ -74,7 +74,7 @@ class ConfidenceBasedAlgorithm {
         shouldRepeatToday = true;
         break;
         
-      case ReviewOutcome.hard:
+      case ReviewOutcome.good:
         // Hard answer - correct but with difficulty
         newInterval = (item.interval * hardIntervalFactor).round();
         if (newInterval < 1) newInterval = 1; // Ensure minimum interval of 1 day
@@ -89,7 +89,7 @@ class ConfidenceBasedAlgorithm {
         shouldRepeatToday = true;
         break;
         
-      case ReviewOutcome.good:
+      case ReviewOutcome.easy:
         // Good answer - correct with moderate effort
         // Grow interval based on ease factor
         newInterval = (item.interval * item.personalDifficultyFactor).round();
@@ -99,22 +99,6 @@ class ConfidenceBasedAlgorithm {
         newEaseFactor = _adjustEaseFactor(item.personalDifficultyFactor, correctEaseIncrease);
         
         // Schedule for review in the future based on new interval
-        newNextReviewDate = DateTime.now().add(Duration(days: newInterval));
-        
-        // Card should not repeat today
-        shouldRepeatToday = false;
-        break;
-        
-      case ReviewOutcome.easy:
-        // Easy answer - correct and very confident
-        // Grow interval more aggressively
-        newInterval = (item.interval * item.personalDifficultyFactor * 1.2).round();
-        if (newInterval < 1) newInterval = 1; // Ensure minimum interval of 1 day
-        
-        // Increase ease factor more
-        newEaseFactor = _adjustEaseFactor(item.personalDifficultyFactor, correctEaseIncrease * 2);
-        
-        // Schedule for review in the future based on the larger new interval
         newNextReviewDate = DateTime.now().add(Duration(days: newInterval));
         
         // Card should not repeat today

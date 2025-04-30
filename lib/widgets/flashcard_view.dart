@@ -3,21 +3,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:lingua_visual/package/models/flashcard_item.dart';
-// import 'package:multi_language_srs/multi_language_srs.dart';
+import 'package:lingua_visual/models/flashcard.dart';
 
 class FlashcardView extends StatefulWidget {
-  final List<FlashcardItem> flashcards;
-  final Function(String, FlashcardItem) onRatingSelected;
+  final List<Flashcard> flashcards;
+  final Function(String, Flashcard) onRatingSelected;
   final String? imageUrl;
-  final bool showTranslation; // Add this new parameter
+  final bool showTranslation;
 
   const FlashcardView({
     super.key,
     required this.flashcards,
     required this.onRatingSelected,
     this.imageUrl,
-    this.showTranslation = true, // Default to true for backward compatibility
+    this.showTranslation = true,
   });
 
   @override
@@ -57,14 +56,17 @@ class _FlashcardViewState extends State<FlashcardView> {
       cardsCount: widget.flashcards.length,
       numberOfCardsDisplayed: 1,
       cardBuilder: (context, index, percentThresholdX, percentThresholdY) {
-        // Add bounds check to prevent index out of range
         if (index >= widget.flashcards.length) {
           print("Index out of bounds: $index/${widget.flashcards.length}");
-          return const SizedBox.shrink(); // Return empty widget for invalid indices
+          return const SizedBox.shrink();
         }
         return _buildFlashcard(widget.flashcards[index]);
       },
       onSwipe: (previousIndex, currentIndex, direction) {
+        if (currentIndex == null || currentIndex >= widget.flashcards.length) {
+          print("Swipe resulted in invalid currentIndex: $currentIndex");
+          return false;
+        }
         return false;
       },
       backCardOffset: const Offset(40, 40),
@@ -72,7 +74,7 @@ class _FlashcardViewState extends State<FlashcardView> {
     );
   }
 
-  Widget _buildFlashcard(FlashcardItem flashcard) {
+  Widget _buildFlashcard(Flashcard flashcard) {
     return GestureDetector(
       onTap: () => _toggleCard(flashcard.id),
       child: TweenAnimationBuilder(
@@ -94,8 +96,8 @@ class _FlashcardViewState extends State<FlashcardView> {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Container(
-                width: double.infinity, // Fill width
-                height: double.infinity, // Fill height
+                width: double.infinity,
+                height: double.infinity,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
@@ -147,17 +149,21 @@ class _FlashcardViewState extends State<FlashcardView> {
     );
   }
 
-  Widget _buildFrontContent(FlashcardItem flashcard) {
+  Widget _buildFrontContent(Flashcard flashcard) {
+    final bool isFlipped = flippedCards[flashcard.id] ?? false;
+    if (isFlipped) {
+      return const SizedBox.shrink();
+    }
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
-            flashcard.question,
+            flashcard.word,
             style: const TextStyle(
-              fontSize: 28,
-              color: Colors.white,
+              fontSize: 32,
               fontWeight: FontWeight.bold,
+              color: Colors.white,
               letterSpacing: 0.5,
             ),
             textAlign: TextAlign.center,
@@ -167,20 +173,19 @@ class _FlashcardViewState extends State<FlashcardView> {
     );
   }
 
-  Widget _buildBackContent(FlashcardItem flashcard) {
+  Widget _buildBackContent(Flashcard flashcard) {
     if (widget.imageUrl != null) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          // mainAxisSize: MainAxisSize.min,
           children: [
             Padding(
               padding: const EdgeInsets.all(8.0),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(
-                  maxHeight: 100, // Limit the maximum height
-                  maxWidth: 100, // Limit the maximum width
+                  maxHeight: 100,
+                  maxWidth: 100,
                 ),
                 child: CachedNetworkImage(
                   imageUrl: widget.imageUrl!,
@@ -189,7 +194,7 @@ class _FlashcardViewState extends State<FlashcardView> {
                       (context, url) => Center(
                         child: CircularProgressIndicator(
                           strokeWidth:
-                              2, // Make the loading indicator more subtle
+                              2,
                         ),
                       ),
                   errorWidget:
@@ -204,7 +209,6 @@ class _FlashcardViewState extends State<FlashcardView> {
       );
     }
 
-    // Center everything if no image
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -214,8 +218,7 @@ class _FlashcardViewState extends State<FlashcardView> {
             if (!(translationVisible[flashcard.id] ?? false))
               IconButton(
                 onPressed:
-                    () =>
-                        setState(() => translationVisible[flashcard.id] = true),
+                    () => setState(() => translationVisible[flashcard.id] = true),
                 icon: const Icon(
                   Icons.visibility,
                   color: Colors.white,
@@ -224,7 +227,7 @@ class _FlashcardViewState extends State<FlashcardView> {
               ),
             if (translationVisible[flashcard.id] ?? false)
               Text(
-                flashcard.answer,
+                flashcard.translation,
                 style: const TextStyle(
                   fontSize: 24,
                   color: Colors.white,
@@ -234,7 +237,7 @@ class _FlashcardViewState extends State<FlashcardView> {
               ),
             const SizedBox(height: 32),
             Wrap(
-              spacing: 12, // Increased spacing slightly
+              spacing: 12,
               runSpacing: 8,
               alignment: WrapAlignment.center,
               children: [
@@ -249,7 +252,7 @@ class _FlashcardViewState extends State<FlashcardView> {
     );
   }
 
-  Widget _buildTranslationAndRatingButtons(FlashcardItem flashcard) {
+  Widget _buildTranslationAndRatingButtons(Flashcard flashcard) {
     return Center(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -263,7 +266,7 @@ class _FlashcardViewState extends State<FlashcardView> {
             ),
           if (translationVisible[flashcard.id] ?? false)
             Text(
-              flashcard.answer,
+              flashcard.translation,
               style: const TextStyle(
                 fontSize: 24,
                 color: Colors.white,
@@ -273,7 +276,7 @@ class _FlashcardViewState extends State<FlashcardView> {
             ),
           const SizedBox(height: 32),
           Wrap(
-            spacing: 12, // Increased spacing slightly
+            spacing: 12,
             runSpacing: 8,
             alignment: WrapAlignment.center,
             children: [
@@ -290,7 +293,7 @@ class _FlashcardViewState extends State<FlashcardView> {
   Widget _buildAnswerButton(
     String label,
     Color color,
-    FlashcardItem flashcard,
+    Flashcard flashcard,
   ) {
     return ElevatedButton(
       onPressed: () {
@@ -307,16 +310,15 @@ class _FlashcardViewState extends State<FlashcardView> {
   Widget _buildRatingButton(
     String label,
     Color color,
-    FlashcardItem flashcard, {
+    Flashcard flashcard, {
     CardSwiperDirection direction = CardSwiperDirection.left,
     bool isLonger = false,
-    }
-  ) {
+  }) {
     return SizedBox(
-      width: isLonger? 100 : 90, // Slightly wider buttons
+      width: isLonger? 100 : 90,
       child: ElevatedButton(
         onPressed: () {
-          widget.onRatingSelected(label, flashcard); // Pass exact label
+          widget.onRatingSelected(label, flashcard);
           controller.swipe(direction);
         },
         style: ElevatedButton.styleFrom(

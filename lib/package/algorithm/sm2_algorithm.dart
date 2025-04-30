@@ -19,9 +19,8 @@ class SM2Algorithm {
   /// Updates a flashcard's SRS parameters based on the review outcome.
   ///
   /// This method implements a modified SM-2 algorithm logic adapted for AdaptiveFlow:
-  /// - For 'missed': Reset interval and increase personal difficulty factor
-  /// - For 'hard': Small interval progression with slight PDF increase
-  /// - For 'good': Increase interval according to the algorithm and keep PDF unchanged
+  /// - For 'hard': Reset interval and increase personal difficulty factor
+  /// - For 'good': Small interval progression with slight PDF increase
   /// - For 'easy': Increase interval more than 'good' and decrease personal difficulty factor
   ///
   /// Returns the updated flashcard item.
@@ -34,13 +33,13 @@ class SM2Algorithm {
     double newPdf = item.personalDifficultyFactor;
     
     switch (outcome) {
-      case ReviewOutcome.missed:
+      case ReviewOutcome.hard:
         // Reset interval and increase personal difficulty factor
         newInterval = 1;
         newPdf = _adjustPdf(item.personalDifficultyFactor, 0.20);
         break;
         
-      case ReviewOutcome.hard:
+      case ReviewOutcome.good:
         // Small interval progression with slight PDF increase
         if (item.reviews == 0) {
           newInterval = initialInterval;
@@ -50,18 +49,6 @@ class SM2Algorithm {
           newInterval = (item.interval * 0.8).round(); // Reduce interval by 20%
         }
         newPdf = _adjustPdf(item.personalDifficultyFactor, 0.05); // Small increase for hard
-        break;
-        
-      case ReviewOutcome.good:
-        // Standard interval progression
-        if (item.reviews == 0) {
-          newInterval = initialInterval;
-        } else if (item.reviews == 1) {
-          newInterval = 6; // Second review as "good" jumps to 6 days
-        } else {
-          newInterval = (item.interval * item.personalDifficultyFactor).round();
-        }
-        newPdf = item.personalDifficultyFactor; // Keep PDF unchanged
         break;
         
       case ReviewOutcome.easy:
@@ -95,7 +82,7 @@ class SM2Algorithm {
       reviews: newReviews,
       nextReviewDate: newNextReviewDate,
       lastReviewType: newLastReviewType,
-      isPriority: outcome == ReviewOutcome.missed,
+      isPriority: outcome == ReviewOutcome.hard,
     );
   }
   

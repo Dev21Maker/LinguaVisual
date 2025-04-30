@@ -3,11 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lingua_visual/providers/firebase_provider.dart';
 import 'package:lingua_visual/providers/navigator_provider.dart';
 import 'package:lingua_visual/widgets/image_prompt_dialog.dart';
-// import 'package:uuid/uuid.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import 'package:uuid/uuid.dart';
 import '../models/online_flashcard.dart';
-// import 'database_provider.dart'; // now using Firestore
-// import 'api_provider.dart';
-// import 'srs_provider.dart';
 import '../services/recraft_api_service.dart';
 
 // Existing providers
@@ -131,6 +130,27 @@ class ActiveLearningNotifier extends StateNotifier<ActiveLearningState> {
   Future<void> processCardRating(String rating) async {
     try {
       if (state.currentCard == null) return;
+
+      final cardToUpdate = state.currentCard!;
+
+      // --- Placeholder for SRS Calculation --- 
+      // TODO: Implement SRS logic based on 'rating' and cardToUpdate's current SRS data
+      // Example: Calculate nextReviewDate, newInterval, etc.
+      // final srsResult = calculateSrsUpdate(cardToUpdate, rating);
+      // final updatedCard = cardToUpdate.copyWith(
+      //   srsNextReviewDate: srsResult.nextReviewDate,
+      //   srsInterval: srsResult.newInterval,
+      //   // ... other SRS fields if needed
+      // );
+      // --------------------------------------
+
+      // For now, let's assume the card is just updated (e.g., last reviewed timestamp if needed)
+      // Replace this with the actual updatedCard from SRS logic later
+      final updatedCard = cardToUpdate; // Use the result from SRS calculation above
+
+      // Update the card in the main state (uses offline-first)
+      // Ensure flashcardStateProvider is available (may need to pass ref or watch)
+      await ref.read(flashcardStateProvider.notifier).updateFlashcard(updatedCard);
       
       final newDueCards = List<OnlineFlashcard>.from(state.dueCards)..removeAt(0);
       state = state.copyWith(
@@ -200,9 +220,24 @@ final flashcardStateProvider = StateNotifierProvider<FlashcardStateNotifier, Asy
 
 class FlashcardStateNotifier extends StateNotifier<AsyncValue<List<OnlineFlashcard>>> {
   final Ref ref;
+  static const String _offlineFlashcardsKey = 'offline_flashcards';
 
   FlashcardStateNotifier(this.ref) : super(const AsyncValue.loading()) {
     _loadFlashcards();
+  }
+
+  Future<void> _saveOfflineFlashcards(List<OnlineFlashcard> flashcards) async {
+    final prefs = await SharedPreferences.getInstance();
+    final flashcardsJson = flashcards.map((card) => jsonEncode(card.toMap())).toList();
+    await prefs.setStringList(_offlineFlashcardsKey, flashcardsJson);
+  }
+
+  Future<List<OnlineFlashcard>> _loadOfflineFlashcards() async {
+    final prefs = await SharedPreferences.getInstance();
+    final flashcardsJson = prefs.getStringList(_offlineFlashcardsKey) ?? [];
+    return flashcardsJson
+        .map((json) => OnlineFlashcard.fromMap(jsonDecode(json)))
+        .toList();
   }
 
   Future<void> _loadFlashcards() async {
@@ -210,78 +245,175 @@ class FlashcardStateNotifier extends StateNotifier<AsyncValue<List<OnlineFlashca
       final firebaseService = ref.read(firebaseServiceProvider);
       final List<OnlineFlashcard> flashcards = await firebaseService.getFlashcards();
       state = AsyncValue.data(flashcards);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
+      await _saveOfflineFlashcards(flashcards); // Save fetched cards offline
+      // await _checkForMissingImages(); // Check for images *after* successful load
+    } catch (e, st) { // Re-add st here
+      // If Firebase fails, try loading from offline storage
+      try {
+        final offlineFlashcards = await _loadOfflineFlashcards();
+        state = AsyncValue.data(offlineFlashcards);
+      } catch (offlineError) { // Keep this catch simple
+        // If both fail, report the original Firebase error and stack trace
+        state = AsyncValue.error(e, st); // Pass original e and st
+      }
     }
   }
 
   Future<void> addFlashcard(OnlineFlashcard flashcard) async {
+    // Get current state or default to empty list if loading/error
+    final currentFlashcards = state.value ?? [];
+    // Generate a new ID if one isn't provided or handle as needed
+    final newFlashcard = flashcard.id.isEmpty 
+      ? flashcard.copyWith(id: const Uuid().v4()) 
+      : flashcard;
+    final updatedFlashcards = [...currentFlashcards, newFlashcard];
+
+    // Update state immediately
+    state = AsyncValue.data(updatedFlashcards);
+
+    await _saveOfflineFlashcards(updatedFlashcards);
+
     try {
       final firebaseService = ref.read(firebaseServiceProvider);
-      await firebaseService.insertCard(flashcard);
-      await _loadFlashcards();
-      _checkForMissingImages();
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
+      // For now, we assume the locally generated ID is sufficient or Firebase handles updates correctly.
+      await firebaseService.insertCard(newFlashcard);
+      // _checkForMissingImages(); // Check images after adding
+    } catch (e) { 
+      // Log Firebase error, but keep local state
+      print('Firebase addFlashcard failed: $e');
+      // Optionally, set a flag indicating sync failure
+      // Revert to error state if Firebase fails? Or keep local state?
+                                       // Let's keep the local state for offline-first
+      state = AsyncValue.data(updatedFlashcards); // Keep local changes
     }
   }
 
   Future<void> _checkForMissingImages() async {
-    if (state.value == null) return;
+    // Only proceed if state is AsyncData
+    if (state is! AsyncData<List<OnlineFlashcard>>) return;
+    final currentFlashcards = state.value!; // Safe to access value now
     
-    final cardsWithoutImages = state.value!
+    final cardsWithoutImages = currentFlashcards
         .where((card) => card.imageUrl == null)
         .toList();
 
     if (cardsWithoutImages.isEmpty) return;
 
-    // Get the BuildContext from a navigator key or similar global key
     final context = ref.read(navigatorKeyProvider).currentContext;
-    if (context == null) return;
+    if (context == null) {
+      print("Warning: BuildContext not available in _checkForMissingImages.");
+      return; // Cannot show dialog without context
+    }
 
     for (final card in cardsWithoutImages) {
+      // Ensure context is still valid before showing dialog in loop
+      if (!context.mounted) {
+        print("Warning: Context became unmounted during _checkForMissingImages loop.");
+        continue; 
+      }
       final imageUrl = await showDialog<String>(
         context: context,
-        barrierDismissible: false,
-        builder: (context) => ImagePromptDialog(
+        barrierDismissible: false, // Keep false for now to ensure user interaction
+        builder: (dialogContext) => ImagePromptDialog(
           word: card.word,
           onImageSelected: (url) async {
-            // Update the flashcard with the new image URL
+            // 1. Update card in Firebase
             final updatedCard = card.copyWith(imageUrl: url);
             final firebaseService = ref.read(firebaseServiceProvider);
-            await firebaseService.updateCard(updatedCard);
-            await _loadFlashcards();
+            try {
+               await firebaseService.updateCard(updatedCard);
+               // 2. Update state *directly*
+               final currentStateValue = state.value; // Re-check state value
+               if (currentStateValue != null) {
+                  final newStateValue = currentStateValue.map((c) =>
+                     c.id == updatedCard.id ? updatedCard : c
+                  ).toList();
+                  state = AsyncValue.data(newStateValue);
+                  await _saveOfflineFlashcards(newStateValue); // Save updated state
+               }
+            } catch (e) {
+                print("Error updating card image in Firebase from dialog: $e");
+                // Optionally show an error to the user via a snackbar/toast
+            }
+            // Ensure dialog is popped if onImageSelected doesn't do it implicitly
+            // Check ImagePromptDialog implementation. Assuming it pops itself.
           },
         ),
       );
 
+      // This block might be redundant if onImageSelected always handles the update.
+      // Keep it as a fallback for now.
       if (imageUrl != null) {
-        final updatedCard = card.copyWith(imageUrl: imageUrl);
-        final firebaseService = ref.read(firebaseServiceProvider);
-        await firebaseService.updateCard(updatedCard);
+         final updatedCard = card.copyWith(imageUrl: imageUrl);
+         final firebaseService = ref.read(firebaseServiceProvider);
+         try {
+             await firebaseService.updateCard(updatedCard);
+             // Update state directly here too
+             final currentStateValue = state.value;
+             if (currentStateValue != null) {
+                final newStateValue = currentStateValue.map((c) =>
+                   c.id == updatedCard.id ? updatedCard : c
+                ).toList();
+                state = AsyncValue.data(newStateValue);
+                await _saveOfflineFlashcards(newStateValue);
+             }
+         } catch (e) {
+             print("Error updating card image directly from dialog return: $e");
+         }
       }
     }
-    
-    await _loadFlashcards();
   }
 
   Future<void> removeFlashcard(String id) async {
+    final currentFlashcards = state.value ?? [];
+    final updatedFlashcards = currentFlashcards.where((card) => card.id != id).toList();
+
+    state = AsyncValue.data(updatedFlashcards);
+
+    await _saveOfflineFlashcards(updatedFlashcards);
+
     try {
       final firebaseService = ref.read(firebaseServiceProvider);
       await firebaseService.deleteCard(id);
-      await _loadFlashcards();
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
+    } catch (e) { 
+      // Log Firebase error, but keep local state
+      print('Firebase removeFlashcard failed: $e');
+      // state = AsyncValue.error(e, st); // Keep local changes?
+      state = AsyncValue.data(updatedFlashcards); // Keep local changes
     }
   }
 
   Future<void> updateFlashcard(OnlineFlashcard flashcard) async {
+    final currentFlashcards = state.value ?? [];
+    final updatedFlashcards = currentFlashcards.map((card) => 
+      card.id == flashcard.id ? flashcard : card
+    ).toList();
+
+    state = AsyncValue.data(updatedFlashcards);
+
+    await _saveOfflineFlashcards(updatedFlashcards);
+
     try {
       final firebaseService = ref.read(firebaseServiceProvider);
       await firebaseService.updateCard(flashcard);
-      await _loadFlashcards();
+    } catch (e) { 
+      // Log Firebase error, but keep local state
+      print('Firebase updateFlashcard failed: $e');
+      // state = AsyncValue.error(e, st); // Keep local changes?
+      state = AsyncValue.data(updatedFlashcards); // Keep local changes
+    }
+  }
+
+  // Add method to clear offline flashcard data
+  Future<void> clearOfflineFlashcardData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_offlineFlashcardsKey);
+      state = const AsyncValue.data([]); // Reset state to empty
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+      // Optionally rethrow or log the error
+      print('Error clearing offline flashcard data: $e');
     }
   }
 }

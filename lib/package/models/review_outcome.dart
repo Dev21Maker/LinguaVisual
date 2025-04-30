@@ -1,27 +1,25 @@
 /// Represents the possible outcomes of a flashcard review based on confidence levels.
 ///
-/// These outcomes correspond to a four-button feedback system (Wrong, Hard, Good, Easy)
+/// These outcomes correspond to a three-button feedback system (Hard, Good, Easy)
 /// and are used to determine how the card's interval and ease factor
 /// should be adjusted.
 enum ReviewOutcome {
-  /// The user failed to recall the card correctly (Wrong).
-  /// This will heavily decrease the interval and ease factor,
-  /// and schedule the card to be reviewed again very soon.
-  missed,
-
   /// The user recalled the card correctly but with significant effort (Hard).
   /// This will slightly decrease the interval and ease factor,
   /// and schedule the card to be reviewed again later today.
+  /// In the UI, this corresponds to the "Missed" button.
   hard,
 
   /// The user recalled the card correctly with moderate effort (Good).
   /// This will increase the interval according to the algorithm
   /// and slightly increase the ease factor.
+  /// In the UI, this corresponds to the "Lucky Guess" button.
   good,
 
   /// The user recalled the card very easily with minimal effort (Easy).
   /// This will increase the interval more than 'good' and
   /// increase the ease factor more significantly.
+  /// In the UI, this corresponds to the "Got It" button.
   easy,
 }
 

@@ -30,12 +30,7 @@ class ActiveLearningState {
   final bool isLoading;
   final String? error;
 
-  const ActiveLearningState({
-    this.dueCards = const [],
-    this.currentCard,
-    this.isLoading = false,
-    this.error,
-  });
+  const ActiveLearningState({this.dueCards = const [], this.currentCard, this.isLoading = false, this.error});
 
   ActiveLearningState copyWith({
     List<OnlineFlashcard>? dueCards,
@@ -60,10 +55,10 @@ class ActiveLearningNotifier extends StateNotifier<ActiveLearningState> {
   Future<void> loadDueCards() async {
     try {
       state = state.copyWith(isLoading: true, error: null);
-      
+
       final firebaseService = ref.read(firebaseServiceProvider);
       final cards = await firebaseService.fetchDueCards();
-      
+
       if (cards.isEmpty) {
         await _fetchAndInsertNewWord();
         final updatedCards = await firebaseService.fetchDueCards();
@@ -73,17 +68,10 @@ class ActiveLearningNotifier extends StateNotifier<ActiveLearningState> {
           isLoading: false,
         );
       } else {
-        state = state.copyWith(
-          dueCards: cards,
-          currentCard: cards.first,
-          isLoading: false,
-        );
+        state = state.copyWith(dueCards: cards, currentCard: cards.first, isLoading: false);
       }
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
@@ -91,7 +79,7 @@ class ActiveLearningNotifier extends StateNotifier<ActiveLearningState> {
     try {
       // final firebaseService = ref.read(firebaseServiceProvider);
       // final settings = ref.read(settingsProvider);
-      
+
       // TODO: Implement fetchNewWordViaFunction for Firebase or handle this feature.
       // final wordData = await firebaseService.fetchNewWordViaFunction(
       //   targetLanguageCode: settings.targetLanguage.code,
@@ -99,7 +87,7 @@ class ActiveLearningNotifier extends StateNotifier<ActiveLearningState> {
       // );
       // For now, throw UnimplementedError or handle as needed.
       throw UnimplementedError('fetchNewWordViaFunction is not implemented for Firebase');
-      
+
       // String? imageUrl;
       // try {
       //   final recraftApi = ref.read(recraftApiProvider);
@@ -120,7 +108,7 @@ class ActiveLearningNotifier extends StateNotifier<ActiveLearningState> {
       //   srsInterval: 1.0,
       //   srsEaseFactor: 2.5,
       // );
-      
+
       // await firebaseService.insertCard(flashcard);
     } catch (e) {
       state = state.copyWith(error: 'Failed to fetch new word: ${e.toString()}');
@@ -131,13 +119,10 @@ class ActiveLearningNotifier extends StateNotifier<ActiveLearningState> {
   Future<void> processCardRating(String rating) async {
     try {
       if (state.currentCard == null) return;
-      
+
       final newDueCards = List<OnlineFlashcard>.from(state.dueCards)..removeAt(0);
-      state = state.copyWith(
-        dueCards: newDueCards,
-        currentCard: newDueCards.isNotEmpty ? newDueCards.first : null,
-      );
-      
+      state = state.copyWith(dueCards: newDueCards, currentCard: newDueCards.isNotEmpty ? newDueCards.first : null);
+
       if (newDueCards.isEmpty) {
         await loadDueCards();
       }
@@ -156,15 +141,9 @@ class FlashcardViewState {
   final bool isFlipped;
   final bool isTranslationVisible;
 
-  const FlashcardViewState({
-    this.isFlipped = false,
-    this.isTranslationVisible = false,
-  });
+  const FlashcardViewState({this.isFlipped = false, this.isTranslationVisible = false});
 
-  FlashcardViewState copyWith({
-    bool? isFlipped,
-    bool? isTranslationVisible,
-  }) {
+  FlashcardViewState copyWith({bool? isFlipped, bool? isTranslationVisible}) {
     return FlashcardViewState(
       isFlipped: isFlipped ?? this.isFlipped,
       isTranslationVisible: isTranslationVisible ?? this.isTranslationVisible,
@@ -228,10 +207,8 @@ class FlashcardStateNotifier extends StateNotifier<AsyncValue<List<OnlineFlashca
 
   Future<void> _checkForMissingImages() async {
     if (state.value == null) return;
-    
-    final cardsWithoutImages = state.value!
-        .where((card) => card.imageUrl == null)
-        .toList();
+
+    final cardsWithoutImages = state.value!.where((card) => card.imageUrl == null).toList();
 
     if (cardsWithoutImages.isEmpty) return;
 
@@ -243,16 +220,17 @@ class FlashcardStateNotifier extends StateNotifier<AsyncValue<List<OnlineFlashca
       final imageUrl = await showDialog<String>(
         context: context,
         barrierDismissible: false,
-        builder: (context) => ImagePromptDialog(
-          word: card.word,
-          onImageSelected: (url) async {
-            // Update the flashcard with the new image URL
-            final updatedCard = card.copyWith(imageUrl: url);
-            final firebaseService = ref.read(firebaseServiceProvider);
-            await firebaseService.updateCard(updatedCard);
-            await _loadFlashcards();
-          },
-        ),
+        builder:
+            (context) => ImagePromptDialog(
+              word: card.word,
+              onImageSelected: (url) async {
+                // Update the flashcard with the new image URL
+                final updatedCard = card.copyWith(imageUrl: url);
+                final firebaseService = ref.read(firebaseServiceProvider);
+                await firebaseService.updateCard(updatedCard);
+                await _loadFlashcards();
+              },
+            ),
       );
 
       if (imageUrl != null) {
@@ -261,7 +239,7 @@ class FlashcardStateNotifier extends StateNotifier<AsyncValue<List<OnlineFlashca
         await firebaseService.updateCard(updatedCard);
       }
     }
-    
+
     await _loadFlashcards();
   }
 
@@ -282,6 +260,25 @@ class FlashcardStateNotifier extends StateNotifier<AsyncValue<List<OnlineFlashca
       await _loadFlashcards();
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> updateCardImage(String cardId, String newImageUrl) async {
+    final currentState = state;
+    if (currentState is AsyncData<List<OnlineFlashcard>>) {
+      final updatedCards =
+          currentState.value.map((card) {
+            if (card.id == cardId) {
+              return card.copyWith(imageUrl: newImageUrl);
+            }
+            return card;
+          }).toList();
+
+      state = AsyncData(updatedCards);
+
+      final firebaseService = ref.read(firebaseServiceProvider);
+      final cardToUpdate = updatedCards.firstWhere((card) => card.id == cardId);
+      await firebaseService.updateCard(cardToUpdate);
     }
   }
 }

@@ -40,11 +40,14 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
   static const String _targetLanguageKey = 'targetLanguageCode';
   static const String _isDarkModeKey = 'isDarkMode';
 
-  SettingsNotifier(this._prefs) : super(SettingsState(
-    nativeLanguage: _getInitialNativeLanguage(_prefs),
-    targetLanguage: _getInitialTargetLanguage(_prefs),
-    isDarkMode: _prefs.getBool(_isDarkModeKey) ?? false,
-  ));
+  SettingsNotifier(this._prefs)
+    : super(
+        SettingsState(
+          nativeLanguage: _getInitialNativeLanguage(_prefs),
+          targetLanguage: _getInitialTargetLanguage(_prefs),
+          isDarkMode: _prefs.getBool(_isDarkModeKey) ?? false,
+        ),
+      );
 
   static Language _getInitialNativeLanguage(SharedPreferences prefs) {
     final savedCode = prefs.getString(_nativeLanguageKey);
@@ -78,15 +81,6 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
   }
 }
 
-// Provider initialization needs to be async now
 final settingsProvider = StateNotifierProvider<SettingsNotifier, SettingsState>((ref) {
   throw UnimplementedError('Need to initialize with SharedPreferences instance');
 });
-
-// Provider initialization helper
-Future<StateNotifierProvider<SettingsNotifier, SettingsState>> initializeSettingsProvider() async {
-  final prefs = await SharedPreferences.getInstance();
-  return StateNotifierProvider<SettingsNotifier, SettingsState>((ref) {
-    return SettingsNotifier(prefs);
-  });
-}

@@ -14,11 +14,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class FlashcardScreen extends HookConsumerWidget {
   const FlashcardScreen({super.key});
 
-  void _showAddFlashcardDialog(
-    BuildContext context,
-    WidgetRef ref,
-    String? stackId,
-  ) {
+  void _showAddFlashcardDialog(BuildContext context, WidgetRef ref, String? stackId) {
     showDialog(
       context: context,
       builder:
@@ -43,36 +39,22 @@ class FlashcardScreen extends HookConsumerWidget {
               children: [
                 TextField(
                   controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Stack Name',
-                    hintText: 'Enter stack name',
-                  ),
+                  decoration: const InputDecoration(labelText: 'Stack Name', hintText: 'Enter stack name'),
                 ),
                 const SizedBox(height: 16),
                 TextField(
                   controller: descriptionController,
-                  decoration: const InputDecoration(
-                    labelText: 'Description',
-                    hintText: 'Enter stack description',
-                  ),
+                  decoration: const InputDecoration(labelText: 'Description', hintText: 'Enter stack description'),
                   maxLines: 3,
                 ),
               ],
             ),
             actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('CANCEL'),
-              ),
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCEL')),
               TextButton(
                 onPressed: () {
                   if (nameController.text.isNotEmpty) {
-                    ref
-                        .read(stacksProvider.notifier)
-                        .createStack(
-                          nameController.text,
-                          descriptionController.text,
-                        );
+                    ref.read(stacksProvider.notifier).createStack(nameController.text, descriptionController.text);
                     Navigator.pop(context);
                   }
                 },
@@ -83,86 +65,74 @@ class FlashcardScreen extends HookConsumerWidget {
     );
   }
 
-  void _showMoveToStackDialog(
-    BuildContext context,
-    WidgetRef ref,
-    Flashcard card,
-    String? currentStackId,
-  ) {
+  void _showMoveToStackDialog(BuildContext context, WidgetRef ref, Flashcard card, String? currentStackId) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Move to Stack'),
-        content: ref.watch(stacksProvider).when(
-          data: (stacks) {
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (currentStackId != null)
-                  ListTile(
-                    leading: const Icon(Icons.remove_circle_outline, color: Colors.red),
-                    title: const Text('Remove from current stack'),
-                    onTap: () {
-                      ref.read(stacksProvider.notifier).removeFlashcardFromStack(
-                        currentStackId,
-                        card.id,
-                      );
-                      Navigator.pop(context);
-                    },
-                  ),
-                if (currentStackId != null)
-                  const Divider(),
-                if (stacks.isEmpty)
-                  const Text('No stacks available. Create a stack first.')
-                else
-                  SizedBox(
-                    width: double.maxFinite,
-                    height: 300, // Fixed height for scrollable list
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: stacks.length,
-                      itemBuilder: (context, index) {
-                        final stack = stacks[index];
-                        final isCurrentStack = stack.id == currentStackId;
-                        final isCardInStack = stack.flashcardIds.contains(card.id);
-                        
-                        return ListTile(
-                          enabled: !isCurrentStack,
-                          leading: const Icon(Icons.folder),
-                          title: Text(stack.name),
-                          trailing: isCardInStack ? const Icon(Icons.check) : null,
-                          onTap: () {
-                            if (isCardInStack) {
-                              ref.read(stacksProvider.notifier).removeFlashcardFromStack(
-                                stack.id,
-                                card.id,
-                              );
-                            } else {
-                              ref.read(stacksProvider.notifier).addFlashcardToStack(
-                                stack.id,
-                                card.id,
-                              );
-                            }
-                            Navigator.pop(context);
-                          },
-                        );
-                      },
-                    ),
-                  ),
-              ],
-            );
-          },
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, _) => Text('Error: $error'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('CLOSE'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Move to Stack'),
+            content: ref
+                .watch(stacksProvider)
+                .when(
+                  data: (stacks) {
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (currentStackId != null)
+                          ListTile(
+                            leading: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                            title: const Text('Remove from current stack'),
+                            onTap: () {
+                              ref.read(stacksProvider.notifier).removeFlashcardFromStack(currentStackId, card.id);
+                              Navigator.pop(context);
+                            },
+                          ),
+                        if (currentStackId != null) const Divider(),
+                        if (stacks.isEmpty)
+                          const Text('No stacks available. Create a stack first.')
+                        else
+                          SizedBox(
+                            width: double.maxFinite,
+                            height: 300, // Fixed height for scrollable list
+                            child: ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: stacks.length,
+                              itemBuilder: (context, index) {
+                                final stack = stacks[index];
+                                final isCurrentStack = stack.id == currentStackId;
+                                final isCardInStack = stack.flashcardIds.contains(card.id);
+
+                                return ListTile(
+                                  enabled: !isCurrentStack,
+                                  leading: const Icon(Icons.folder),
+                                  title: Text(stack.name),
+                                  trailing: isCardInStack ? const Icon(Icons.check) : null,
+                                  onTap: () {
+                                    if (isCardInStack) {
+                                      ref.read(stacksProvider.notifier).removeFlashcardFromStack(stack.id, card.id);
+                                    } else {
+                                      ref.read(stacksProvider.notifier).addFlashcardToStack(stack.id, card.id);
+                                    }
+                                    Navigator.pop(context);
+                                  },
+                                );
+                              },
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (error, _) => Text('Error: $error'),
+                ),
+            actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('CLOSE'))],
           ),
-        ],
-      ),
     );
+  }
+
+  Future<void> _updateCardImage(BuildContext context, WidgetRef ref, String cardId, String newImageUrl) async {
+    final flashcardProvider = ref.read(flashcardStateProvider.notifier);
+    await flashcardProvider.updateCardImage(cardId, newImageUrl);
   }
 
   @override
@@ -191,10 +161,7 @@ class FlashcardScreen extends HookConsumerWidget {
     }
 
     void _changeTranslationVisibility(String id) =>
-        translationVisible.value = {
-          ...translationVisible.value,
-          id: !(translationVisible.value[id] ?? false),
-        };
+        translationVisible.value = {...translationVisible.value, id: !(translationVisible.value[id] ?? false)};
 
     return Scaffold(
       appBar: AppBar(
@@ -239,38 +206,33 @@ class FlashcardScreen extends HookConsumerWidget {
                     break;
                 }
               },
-              itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-                PopupMenuItem<String>(
-                  value: 'toggle_order',
-                  child: Row(
-                    children: [
-                      Icon(
-                        isReversed.value 
-                            ? Icons.sort_rounded 
-                            : Icons.sort_by_alpha_rounded,
-                        size: 20,
-                        color: Theme.of(context).iconTheme.color,
+              itemBuilder:
+                  (BuildContext context) => <PopupMenuEntry<String>>[
+                    PopupMenuItem<String>(
+                      value: 'toggle_order',
+                      child: Row(
+                        children: [
+                          Icon(
+                            isReversed.value ? Icons.sort_rounded : Icons.sort_by_alpha_rounded,
+                            size: 20,
+                            color: Theme.of(context).iconTheme.color,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(isReversed.value ? 'Oldest' : 'Latest'),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      Text(isReversed.value ? 'Oldest' : 'Latest'),
-                    ],
-                  ),
-                ),
-                PopupMenuItem<String>(
-                  value: 'refresh',
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.refresh,
-                        size: 20,
-                        color: Theme.of(context).iconTheme.color,
+                    ),
+                    PopupMenuItem<String>(
+                      value: 'refresh',
+                      child: Row(
+                        children: [
+                          Icon(Icons.refresh, size: 20, color: Theme.of(context).iconTheme.color),
+                          const SizedBox(width: 8),
+                          const Text('Refresh'),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      const Text('Refresh'),
-                    ],
-                  ),
-                ),
-              ],
+                    ),
+                  ],
             ),
           ],
         ),
@@ -282,21 +244,13 @@ class FlashcardScreen extends HookConsumerWidget {
               (stacks) => ListView(
                 children: [
                   DrawerHeader(
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).primaryColor,
-                    ),
+                    decoration: BoxDecoration(color: Theme.of(context).primaryColor),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Flashcard Stacks',
-                          style: TextStyle(color: Colors.white, fontSize: 24),
-                        ),
+                        const Text('Flashcard Stacks', style: TextStyle(color: Colors.white, fontSize: 24)),
                         const SizedBox(height: 8),
-                        Text(
-                          '${stacks.length} Stacks',
-                          style: const TextStyle(color: Colors.white70),
-                        ),
+                        Text('${stacks.length} Stacks', style: const TextStyle(color: Colors.white70)),
                         const Spacer(),
                         ElevatedButton.icon(
                           onPressed: () => _showCreateStackDialog(context, ref),
@@ -324,9 +278,7 @@ class FlashcardScreen extends HookConsumerWidget {
                     const ListTile(
                       leading: Icon(Icons.info_outline),
                       title: Text('No stacks yet'),
-                      subtitle: Text(
-                        'Create a stack to organize your flashcards',
-                      ),
+                      subtitle: Text('Create a stack to organize your flashcards'),
                     )
                   else
                     ...stacks.map(
@@ -342,20 +294,23 @@ class FlashcardScreen extends HookConsumerWidget {
                         confirmDismiss: (direction) async {
                           return await showDialog(
                             context: context,
-                            builder: (context) => AlertDialog(
-                              title: const Text('Delete Stack'),
-                              content: Text('Are you sure you want to delete the stack "${stack.name}"? This will not delete the flashcards.'),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.of(context).pop(false),
-                                  child: const Text('CANCEL'),
+                            builder:
+                                (context) => AlertDialog(
+                                  title: const Text('Delete Stack'),
+                                  content: Text(
+                                    'Are you sure you want to delete the stack "${stack.name}"? This will not delete the flashcards.',
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.of(context).pop(false),
+                                      child: const Text('CANCEL'),
+                                    ),
+                                    TextButton(
+                                      onPressed: () => Navigator.of(context).pop(true),
+                                      child: const Text('DELETE', style: TextStyle(color: Colors.red)),
+                                    ),
+                                  ],
                                 ),
-                                TextButton(
-                                  onPressed: () => Navigator.of(context).pop(true),
-                                  child: const Text('DELETE', style: TextStyle(color: Colors.red)),
-                                ),
-                              ],
-                            ),
                           );
                         },
                         onDismissed: (_) {
@@ -378,46 +333,35 @@ class FlashcardScreen extends HookConsumerWidget {
           loading: () => const Center(child: CircularProgressIndicator()),
           error:
               (error, _) => Center(
-                child: Text(
-                  'Error loading stacks',
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
+                child: Text('Error loading stacks', style: TextStyle(color: Theme.of(context).colorScheme.error)),
               ),
         ),
       ),
       body: flashcardsAsync.when(
         data: (flashcards) {
           // Filter flashcards based on selected stack
-          final filteredFlashcards = selectedStackId.value != null
-              ? flashcards.where((card) {
-                  final stack = stacksAsync.value?.firstWhere(
-                    (s) => s.id == selectedStackId.value,
-                    orElse: () => stacksAsync.value!.last,
-                  );
-                  return stack?.flashcardIds.contains(card.id) ?? false;
-                }).toList()
-              : flashcards;
+          final filteredFlashcards =
+              selectedStackId.value != null
+                  ? flashcards.where((card) {
+                    final stack = stacksAsync.value?.firstWhere(
+                      (s) => s.id == selectedStackId.value,
+                      orElse: () => stacksAsync.value!.last,
+                    );
+                    return stack?.flashcardIds.contains(card.id) ?? false;
+                  }).toList()
+                  : flashcards;
 
           // Apply the reverse order if needed
-          final displayedFlashcards = isReversed.value 
-              ? filteredFlashcards.reversed.toList()
-              : filteredFlashcards;
+          final displayedFlashcards = isReversed.value ? filteredFlashcards.reversed.toList() : filteredFlashcards;
 
           if (displayedFlashcards.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(
-                    Icons.school_outlined,
-                    size: 64,
-                    color: Colors.grey,
-                  ),
+                  const Icon(Icons.school_outlined, size: 64, color: Colors.grey),
                   const SizedBox(height: 16),
-                  Text(
-                    'No flashcards available',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
+                  Text('No flashcards available', style: Theme.of(context).textTheme.titleLarge),
                   const SizedBox(height: 8),
                   Text(
                     'Add some flashcards to get started',
@@ -436,26 +380,16 @@ class FlashcardScreen extends HookConsumerWidget {
               return FlashcardTile(
                 card: card,
                 translationVisible: translationVisible,
-                changeTranslationVisibility: (p0) => 
-                    _changeTranslationVisibility(p0),
-                showMoveToStackDialog: () => _showMoveToStackDialog(
-                  context,
-                  ref,
-                  card,
-                  selectedStackId.value,
-                ),
+                changeTranslationVisibility: (p0) => _changeTranslationVisibility(p0),
+                showMoveToStackDialog: () => _showMoveToStackDialog(context, ref, card, selectedStackId.value),
                 getEmoji: () {
                   if (ref.read(isOnlineProvider.notifier).state) {
                     return card.targetLanguage.emoji;
                   } else {
-                    return supportedLanguages
-                        .firstWhere(
-                          (element) => 
-                              element.code == card.targetLanguageCode,
-                        )
-                        .emoji;
+                    return supportedLanguages.firstWhere((element) => element.code == card.targetLanguageCode).emoji;
                   }
                 },
+                onImageUpdated: (cardId, imageUrl) => _updateCardImage(context, ref, cardId, imageUrl),
               );
             },
           );
@@ -468,16 +402,11 @@ class FlashcardScreen extends HookConsumerWidget {
                 children: [
                   const Icon(Icons.error_outline, size: 64, color: Colors.red),
                   const SizedBox(height: 16),
-                  Text(
-                    'Error loading flashcards',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
+                  Text('Error loading flashcards', style: Theme.of(context).textTheme.titleLarge),
                   const SizedBox(height: 8),
                   Text(
                     error.toString(),
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.error),
                     textAlign: TextAlign.center,
                   ),
                 ],
@@ -485,8 +414,7 @@ class FlashcardScreen extends HookConsumerWidget {
             ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed:
-            () => _showAddFlashcardDialog(context, ref, selectedStackId.value),
+        onPressed: () => _showAddFlashcardDialog(context, ref, selectedStackId.value),
         child: const Icon(Icons.add),
       ),
     );

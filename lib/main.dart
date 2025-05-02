@@ -1,8 +1,10 @@
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:lingua_visual/providers/connectivity_provider.dart';
+import 'package:lingua_visual/providers/locale_provider.dart';
 import 'package:lingua_visual/providers/navigator_provider.dart';
 import 'package:lingua_visual/providers/tab_index_provider.dart';
 import 'package:lingua_visual/screens/games/games_view.dart';
@@ -17,6 +19,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'services/session_cleanup_service.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -165,6 +169,7 @@ class MyApp extends HookConsumerWidget {
 
     final settings = ref.watch(settingsProvider);
     final themeMode = settings.isDarkMode ? ThemeMode.dark : ThemeMode.light;
+    final currentLocale = ref.watch(localeProvider);
 
     useEffect(() {
       final connectivity = Connectivity();
@@ -188,6 +193,17 @@ class MyApp extends HookConsumerWidget {
       theme: _buildTheme(const AppTheme(isDark: false)),
       darkTheme: _buildTheme(const AppTheme(isDark: true)),
       themeMode: themeMode,
+      locale: currentLocale,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('en'), // English
+        Locale('pl'), // Polish
+      ],
       home: Consumer(
         builder: (context, ref, child) {
           final isOnline = ref.watch(isOnlineProvider);
@@ -282,234 +298,47 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final currentIndex = ref.watch(tabIndexProvider);
 
-    return Scaffold(
-      body: DefaultTabController(
-        length: 4,
-        initialIndex: currentIndex,
-        child: HookBuilder(
-          builder: (context) {
-            final tabController = DefaultTabController.of(context);
+    return SafeArea(
+      top: false,
+      child: Scaffold(
+        body: DefaultTabController(
+          length: 4,
+          initialIndex: currentIndex,
+          child: HookBuilder(
+            builder: (context) {
+              final tabController = DefaultTabController.of(context);
 
-            useEffect(() {
-              void listener() {
-                ref.read(tabIndexProvider.notifier).setIndex(tabController.index);
-              }
+              useEffect(() {
+                void listener() {
+                  ref.read(tabIndexProvider.notifier).setIndex(tabController.index);
+                }
 
-              tabController.addListener(listener);
-              return () => tabController.removeListener(listener);
-            }, [tabController]);
+                tabController.addListener(listener);
+                return () => tabController.removeListener(listener);
+              }, [tabController]);
 
-            return Scaffold(
-              bottomNavigationBar: TabBar(
-                controller: tabController,
-                tabs: const [
-                  Tab(icon: Icon(Icons.school), text: 'Learn'),
-                  Tab(icon: Icon(Icons.library_books), text: 'Flashcards'),
-                  Tab(icon: Icon(Icons.bar_chart), text: 'Progress'),
-                  Tab(icon: Icon(Icons.settings), text: 'Settings'),
-                ],
-              ),
-              body: TabBarView(
-                controller: tabController,
-                children: const [GamesView(), FlashcardScreen(), ProgressScreen(), SettingsScreen()],
-              ),
-            );
-          },
+              return SafeArea(
+                top: false,
+                child: Scaffold(
+                  bottomNavigationBar: TabBar(
+                    controller: tabController,
+                    tabs: const [
+                      Tab(icon: Icon(Icons.school), text: 'Learn'),
+                      Tab(icon: Icon(Icons.library_books), text: 'Flashcards'),
+                      Tab(icon: Icon(Icons.bar_chart), text: 'Progress'),
+                      Tab(icon: Icon(Icons.settings), text: 'Settings'),
+                    ],
+                  ),
+                  body: TabBarView(
+                    controller: tabController,
+                    children: const [GamesView(), FlashcardScreen(), ProgressScreen(), SettingsScreen()],
+                  ),
+                ),
+              );
+            },
+          ),
         ),
       ),
     );
   }
 }
-
-// class OfflineFlashcardsNotifier extends StateNotifier<AsyncValue<List<Flashcard>>> {
-//   OfflineFlashcardsNotifier() : super(const AsyncValue.loading()) {
-//     _loadFlashcards();
-//   }
-
-//   Future<void> _loadFlashcards() async {
-//     try {
-//       final prefs = await SharedPreferences.getInstance();
-//       final flashcardsJson = prefs.getStringList('offline_flashcards') ?? [];
-//       final cards = flashcardsJson
-//           .map((json) => Flashcard.fromMap(jsonDecode(json)))
-//           .toList();
-//       state = AsyncValue.data(cards);
-//     } catch (e, st) {
-//       state = AsyncValue.error(e, st);
-//     }
-//   }
-
-//   Future<void> addFlashcard(Flashcard flashcard) async {
-//     final current = state.value ?? [];
-//     state = AsyncValue.data([...current, flashcard]);
-//     await _saveFlashcards();
-//   }
-
-//   Future<void> _saveFlashcards() async {
-//     final prefs = await SharedPreferences.getInstance();
-//     final current = state.value ?? [];
-//     final flashcardsJson = current
-//         .map((flashcard) => jsonEncode(flashcard.toMap()))
-//         .toList();
-//     await prefs.setStringList('offline_flashcards', flashcardsJson);
-//   }
-
-//   Future<void> removeFlashcard(String id) async {
-//     final current = state.value ?? [];
-//     state = AsyncValue.data(current.where((flashcard) => flashcard.id != id).toList());
-//     await _saveFlashcards();
-//   }
-
-//   Future<void> updateCard(Flashcard updatedCard) async {
-//     final current = state.value ?? [];
-//     state = AsyncValue.data(current.map((card) =>
-//       card.id == updatedCard.id ? updatedCard : card
-//     ).toList());
-//     await _saveFlashcards();
-//   }
-// }
-
-// final offlineFlashcardsProvider = StateNotifierProvider<OfflineFlashcardsNotifier, AsyncValue<List<Flashcard>>>((ref) {
-//   return OfflineFlashcardsNotifier();
-// });
-
-// class OfflineLearnScreen extends ConsumerWidget {
-//   const OfflineLearnScreen({super.key});
-
-//   @override
-//   Widget build(BuildContext context, WidgetRef ref) {
-//     final flashcardsAsync = ref.watch(offlineFlashcardsProvider);
-
-//     return flashcardsAsync.when(
-//       loading: () => const Center(child: CircularProgressIndicator()),
-//       error: (err, stack) => Center(child: Text('Error loading flashcards')), // Optionally show error
-//       data: (flashcards) {
-//         if (flashcards.isEmpty) {
-//           return const Center(
-//             child: Text('No flashcards available offline'),
-//           );
-//         }
-//         return Scaffold(
-//           body: Center(
-//             child: Column(
-//               mainAxisAlignment: MainAxisAlignment.center,
-//               children: [
-//                 Text(
-//                   '${flashcards.length} cards available',
-//                   style: Theme.of(context).textTheme.titleLarge,
-//                 ),
-//                 const SizedBox(height: 24),
-//                 ElevatedButton.icon(
-//                   onPressed: () {
-//                     Navigator.of(context).push(
-//                       MaterialPageRoute(
-//                         builder: (context) => const OfflineTrainingScreen(),
-//                       ),
-//                     );
-//                   },
-//                   icon: const Icon(Icons.play_arrow),
-//                   label: const Text('Start Training'),
-//                   style: ElevatedButton.styleFrom(
-//                     padding: const EdgeInsets.symmetric(
-//                       horizontal: 32,
-//                       vertical: 16,
-//                     ),
-//                   ),
-//                 ),
-//               ],
-//             ),
-//           ),
-//         );
-//       },
-//     );
-//   }
-// }
-
-// class OfflineFlashcardScreen extends HookConsumerWidget {
-//   const OfflineFlashcardScreen({super.key});
-
-//   void _showAddFlashcardDialog(BuildContext context, WidgetRef ref) {
-//     showDialog(
-//       context: context,
-//       builder: (context) {
-//         return FlashCardBuilder(
-//           ref: ref,
-//         );
-//       },
-//     );
-//   }
-
-//   @override
-//   Widget build(BuildContext context, WidgetRef ref) {
-//     final flashcardsAsync = ref.watch(offlineFlashcardsProvider);
-
-//     return flashcardsAsync.when(
-//       loading: () => const Center(child: CircularProgressIndicator()),
-//       error: (err, stack) => Center(child: Text('Error loading flashcards')), // Optionally show error
-//       data: (flashcards) => Scaffold(
-//         body: flashcards.isEmpty
-//             ? Center(
-//                 child: Column(
-//                   mainAxisAlignment: MainAxisAlignment.center,
-//                   children: [
-//                     const Text(
-//                       'No flashcards available',
-//                       style: TextStyle(fontSize: 18),
-//                     ),
-//                     const SizedBox(height: 16),
-//                     ElevatedButton.icon(
-//                       onPressed: () => _showAddFlashcardDialog(context, ref),
-//                       icon: const Icon(Icons.add),
-//                       label: const Text('Add Your First Flashcard'),
-//                     ),
-//                   ],
-//                 ),
-//               )
-//             : ListView.builder(
-//                 itemCount: flashcards.length,
-//                 itemBuilder: (context, index) {
-//                   final flashcard = flashcards[index];
-//                   return Dismissible(
-//                     key: Key(flashcard.id), // Convert id to String for Key
-//                     background: Container(
-//                       color: Colors.red,
-//                       alignment: Alignment.centerRight,
-//                       padding: const EdgeInsets.only(right: 16),
-//                       child: const Icon(Icons.delete, color: Colors.white),
-//                     ),
-//                     direction: DismissDirection.endToStart,
-//                     onDismissed: (direction) {
-//                       ref.read(offlineFlashcardsProvider.notifier)
-//                           .removeFlashcard(flashcard.id);
-//                       ScaffoldMessenger.of(context).showSnackBar(
-//                         const SnackBar(
-//                           content: Text('Flashcard deleted'),
-//                           backgroundColor: Colors.red,
-//                         ),
-//                       );
-//                     },
-//                     child: Card(
-//                       margin: const EdgeInsets.symmetric(
-//                         horizontal: 16,
-//                         vertical: 8,
-//                       ),
-//                       child: ListTile(
-//                         title: Text(flashcard.word),
-//                         subtitle: Text(flashcard.translation),
-//                         trailing: Text(
-//                           'Last reviewed: ${flashcard.srsLastReviewDate != null ? "Yes" : "No"}',
-//                           style: Theme.of(context).textTheme.bodySmall,
-//                         ),
-//                       ),
-//                     ),
-//                   );
-//                 },
-//               ),
-//         floatingActionButton: FloatingActionButton(
-//           onPressed: () => _showAddFlashcardDialog(context, ref),
-//           child: const Icon(Icons.add),
-//         ),
-//       ),
-//     );
-//   }
-// }

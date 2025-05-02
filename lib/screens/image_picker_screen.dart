@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lingua_visual/widgets/image_picker_web_view.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 /// A screen that demonstrates the ImagePickerWebView component.
 class ImagePickerScreen extends StatefulWidget {
@@ -14,9 +15,11 @@ class _ImagePickerScreenState extends State<ImagePickerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Image Picker'),
+        title: Text(l10n.imagePickerAppBarTitle),
         actions: [
           if (_selectedImageUrl != null)
             IconButton(
@@ -36,12 +39,9 @@ class _ImagePickerScreenState extends State<ImagePickerScreen> {
               height: 150,
               width: double.infinity,
               color: Colors.black12,
-              child: Image.network(
-                _selectedImageUrl!,
-                fit: BoxFit.contain,
-              ),
+              child: Image.network(_selectedImageUrl!, fit: BoxFit.contain),
             ),
-          
+
           // WebView for picking images
           Expanded(
             child: ImagePickerWebView(
@@ -49,14 +49,14 @@ class _ImagePickerScreenState extends State<ImagePickerScreen> {
                 setState(() {
                   _selectedImageUrl = imageUrl;
                 });
-                
+
                 // Show a snackbar to indicate that an image was selected
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: const Text('Image selected! Tap the checkmark to use it.'),
+                    content: Text(l10n.imagePickerSelectedSnackbar),
                     duration: const Duration(seconds: 2),
                     action: SnackBarAction(
-                      label: 'Use',
+                      label: l10n.imagePickerUseButton,
                       onPressed: () {
                         Navigator.of(context).pop(_selectedImageUrl);
                       },
@@ -64,6 +64,7 @@ class _ImagePickerScreenState extends State<ImagePickerScreen> {
                   ),
                 );
               },
+              initialUrl: 'https://www.google.com/search?tbm=isch',
             ),
           ),
         ],

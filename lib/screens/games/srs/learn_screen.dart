@@ -8,6 +8,7 @@ import 'package:lingua_visual/providers/stack_provider.dart';
 import 'package:lingua_visual/widgets/flashcard_view.dart';
 import 'package:lingua_visual/package/srs_manager.dart' as srs_package;
 import 'package:lingua_visual/package/algorithm/adaptive_flow_algorithm.dart' show SrsItem;
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 // LearnScreen Widget: Manages the Spaced Repetition System (SRS) learning session.
 class LearnScreen extends HookConsumerWidget {
@@ -34,7 +35,10 @@ class LearnScreen extends HookConsumerWidget {
     final srsManager = useMemoized(() => srs_package.SRSManager(), []);
     // Controls visibility of the 'Load More Cards' option when initial due list is empty.
     final showLoadMoreOption = useState(false);
-    
+
+    // Get localization object
+    final l10n = AppLocalizations.of(context)!;
+
     // --- Function: Process flashcards and load due cards ---
     Future<void> processFlashcardsAndLoadDueCards(AsyncValue<List<Flashcard>> flashcardsAsync) async {
       // Reset state for loading sequence
@@ -82,7 +86,7 @@ class LearnScreen extends HookConsumerWidget {
             debugPrint('Filtered flashcards first: ${filteredFlashcards.first}');
           } catch (e) {
             debugPrint("Error finding stack ${selectedStackId.value}: $e");
-            errorState.value = "Error loading stack. Showing all cards.";
+            errorState.value = l10n.learnErrorLoadingStack;
             selectedStackId.value = null;
             filteredFlashcards = List<Flashcard>.from(flashcards);
           }
@@ -99,12 +103,12 @@ class LearnScreen extends HookConsumerWidget {
         final dueItems = srsManager.getDueItems(now: DateTime.now().millisecondsSinceEpoch);
         dueItemsState.value = dueItems;
         
-        // // Show load more option if no due items but we have flashcards
+        // Show load more option if no due items but we have flashcards
         if (dueItems.isEmpty && filteredFlashcards.isNotEmpty) {
           showLoadMoreOption.value = true;
         }
         
-        // // Show empty state if no due items and no load more option
+        // Show empty state if no due items and no load more option
         if (dueItems.isEmpty && !showLoadMoreOption.value) {
           showEmptyState.value = true;
         }
@@ -170,7 +174,6 @@ class LearnScreen extends HookConsumerWidget {
     }, [selectedStackId.value]);
 
     // --- Function: Show Stack Selector Dialog ---
-    // Displays a dialog allowing the user to select a flashcard stack or 'All Cards'.
     void showStackSelector(
       BuildContext context,
       WidgetRef ref,
@@ -241,8 +244,6 @@ class LearnScreen extends HookConsumerWidget {
     }
 
     // --- Function: Load Next Closest Cards ---
-    // Fetches a small batch of the next upcoming (not yet due) cards 
-    // when the initial due list is empty or exhausted.
     void loadNextClosestCards() async {
       isLoadingState.value = true; // Indicate loading
       showLoadMoreOption.value = false; // Hide the button while loading
@@ -271,60 +272,196 @@ class LearnScreen extends HookConsumerWidget {
       isLoadingState.value = false; // Loading finished
     }
 
-    // --- Function: Build Body Content ---
-    // Determines what to display based on loading, error, and data states.
+    // --- Function: Build Body Content Based on State ---
     Widget buildBody(
       BuildContext context,
       bool isLoading, // Current loading state
       String? error, // Current error message
       List<SrsItem> dueItems, // List of due SRS items
-      bool showEmpty, // Whether to show the empty state message
-      ValueNotifier<String?> selectedStackId, // Current stack selection
-      VoidCallback loadDueCards, // Callback to reload due cards
-      ValueNotifier<bool> isSessionComplete, // Session completion state
-      ValueNotifier<Map<String, (SrsItem, String)>> reviewedCards, // State for reviewed cards
-      ValueNotifier<List<SrsItem>> dueItemsState, // State for due items
-      srs_package.SRSManager srsManager, // The SRS manager instance
-      WidgetRef ref, // Reference to the widget's context
+      bool showEmpty, // Flag for no items state
+      ValueNotifier<String?> stackIdNotifier, // Selected stack ID state
+      VoidCallback reloadFunction, // Function to reload/retry
+      ValueNotifier<bool> sessionCompleteNotifier, // Session completion state
+      ValueNotifier<Map<String, (SrsItem, String)>> reviewedState, // Reviewed cards state
+      ValueNotifier<List<SrsItem>> dueItemsListState, // Due items list state
+      srs_package.SRSManager srsMgr, // SRS manager instance
+      WidgetRef widgetRef, // WidgetRef for provider access
     ) {
+      // --- Loading State --- 
       if (isLoading) {
-        // Show a loading indicator while data is being fetched.
-        return const Center(child: CircularProgressIndicator());
-      }
-
-      if (error != null) {
-        // Display an error message if one occurred during loading or processing.
         return Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.error_outline, size: 64, color: Colors.red),
+              const CircularProgressIndicator(),
               const SizedBox(height: 16),
-              Text('Error: $error'),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: loadDueCards,
-                child: const Text('Retry'),
-              ),
+              Text(l10n.learnLoadingSession),
             ],
           ),
         );
       }
 
-      if (dueItems.isEmpty) {
-        // Display a message if there are no due cards.
-        // This could be because the session is complete or initially no cards were due.
+      // --- Error State ---
+      if (error != null) {
         return Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.check_circle_outline, size: 64, color: Colors.green),
-              const SizedBox(height: 16),
-              Text(
-                showEmpty ? 'No cards due for review!' : 'Loading cards...',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ],
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                const SizedBox(height: 16),
+                Text(
+                  l10n.learnErrorLoadingSession,
+                  style: Theme.of(context).textTheme.headlineSmall,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(error, textAlign: TextAlign.center),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.refresh),
+                  label: Text(l10n.commonRetry),
+                  onPressed: reloadFunction, // Retry loading
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+
+      // --- Session Complete State ---
+      if (sessionCompleteNotifier.value) {
+        // Calculate summary counts
+        int quickCount = reviewedState.value.values.where((item) => item.$2 == l10n.learnRatingQuick).length;
+        int goodCount = reviewedState.value.values.where((item) => item.$2 == l10n.learnRatingGood).length;
+        int missedCount = reviewedState.value.values.where((item) => item.$2 == l10n.learnRatingMissed).length;
+
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.check_circle_outline, color: Colors.green, size: 64),
+                const SizedBox(height: 24),
+                Text(
+                  l10n.learnSessionCompleteTitle,
+                  style: Theme.of(context).textTheme.headlineMedium,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  l10n.learnSessionCompleteSubtitle,
+                  style: Theme.of(context).textTheme.bodyLarge,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 32),
+                Card(
+                  elevation: 4,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l10n.learnReviewSummaryTitle,
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(l10n.learnSummaryQuickLabel, style: const TextStyle(color: Colors.blue)),
+                            Text('$quickCount'),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(l10n.learnSummaryGoodLabel, style: const TextStyle(color: Colors.green)),
+                            Text('$goodCount'),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(l10n.learnSummaryMissedLabel, style: const TextStyle(color: Colors.red)),
+                            Text('$missedCount'),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 32),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.arrow_back),
+                  label: Text(MaterialLocalizations.of(context).backButtonTooltip),
+                  onPressed: () => Navigator.of(context).pop(), // Go back
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+
+      // --- No Cards Available or Due State ---
+      if (showEmpty || (dueItems.isEmpty && !isLoading && error == null && !showLoadMoreOption.value)) {
+        // Special case: Initial load was empty, offer to load more
+        if (showLoadMoreOption.value) {
+            return Center(
+                child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                            const Icon(Icons.hourglass_empty, size: 48, color: Colors.grey),
+                            const SizedBox(height: 16),
+                            Text(l10n.learnNoCardsDueNow, style: Theme.of(context).textTheme.headlineSmall, textAlign: TextAlign.center),
+                            const SizedBox(height: 8),
+                            Text(l10n.learnLoadNextClosestPrompt, textAlign: TextAlign.center),
+                            const SizedBox(height: 24),
+                            ElevatedButton(
+                                onPressed: loadNextClosestCards,
+                                child: Text(l10n.learnLoadCardsButton),
+                            ),
+                        ],
+                    ),
+                ),
+            );
+        }
+
+        // General empty state
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.inbox, size: 48, color: Colors.grey),
+                const SizedBox(height: 16),
+                Text(
+                  l10n.learnNoCardsAvailableTitle,
+                  style: Theme.of(context).textTheme.headlineSmall,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  l10n.learnNoCardsAvailableSubtitle,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.refresh),
+                  label: Text(l10n.learnLoadCardsButton),
+                  onPressed: reloadFunction, // Try loading again
+                ),
+              ],
+            ),
           ),
         );
       }
@@ -378,18 +515,14 @@ class LearnScreen extends HookConsumerWidget {
           if (updatedItem != null) {
             debugPrint('AFTER - Next review: ${DateTime.fromMillisecondsSinceEpoch(updatedItem.nextReview).toIso8601String()}, PDF: ${updatedItem.pdf}, Interval: ${updatedItem.lastInterval}');
             
-            // --- Update Flashcard State (Online Provider) ---
-            // Get the current state of online flashcards.
-            final onlineFlashcardsState = ref.read(flashcardStateProvider);
-            if (onlineFlashcardsState.hasValue) {
-              // First check if the flashcard exists in the current state
-              final cardIndex = onlineFlashcardsState.value!.indexWhere(
-                (card) => card.id == flashcard.id
-              );
+            // --- Persist Changes ---
+            // Find the corresponding Flashcard object to update its SRS data
+            final flashcardsAsync = ref.read(flashcardStateProvider);
+            if (flashcardsAsync is AsyncData<List<Flashcard>>) {
+              final allFlashcards = flashcardsAsync.value;
+              final cardToUpdate = allFlashcards?.firstWhere((c) => c.id == flashcard.id, orElse: () => throw Exception('Card not found'));
               
-              if (cardIndex >= 0) {
-                // Card exists, create an updated version
-                final cardToUpdate = onlineFlashcardsState.value![cardIndex];
+              if (cardToUpdate != null) {
                 
                 // Create an updated flashcard object with new SRS data.
                 final updatedCard = cardToUpdate.copyWith(
@@ -413,18 +546,18 @@ class LearnScreen extends HookConsumerWidget {
             
             // --- Update Local UI State ---
             // Add the reviewed card and its rating to the session's reviewed list.
-            final newReviewedCards = Map<String, (SrsItem, String)>.from(reviewedCards.value);
+            final newReviewedCards = Map<String, (SrsItem, String)>.from(reviewedState.value);
             newReviewedCards[flashcard.id] = (updatedItem, rating);
-            reviewedCards.value = newReviewedCards;
+            reviewedState.value = newReviewedCards;
             
             // Remove the reviewed card from the list of currently due items.
-            final currentDueItems = List<SrsItem>.from(dueItemsState.value);
+            final currentDueItems = List<SrsItem>.from(dueItemsListState.value);
             currentDueItems.removeWhere((item) => item.id == updatedItem.id); 
-            dueItemsState.value = currentDueItems;
+            dueItemsListState.value = currentDueItems;
             
             // Check if the due items list is now empty, signifying session completion.
-            if (dueItemsState.value.isEmpty) {
-              isSessionComplete.value = true;
+            if (dueItemsListState.value.isEmpty) {
+              sessionCompleteNotifier.value = true;
               // Potentially show a completion message or navigate away.
             }
           }
@@ -434,41 +567,44 @@ class LearnScreen extends HookConsumerWidget {
     }
 
     // Build the main screen structure using Scaffold.
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Review Cards'),
-        // Add actions to the AppBar.
-        actions: [
-          // Button to open the stack selector dialog.
-          IconButton(
-            icon: const Icon(Icons.filter_list), // Filter icon
-            tooltip: 'Select Stack', // Tooltip for accessibility
-            onPressed: () {
-              // Call the function to show the stack selector dialog.
-              showStackSelector(
-                context,
-                ref,
-                selectedStackId, // Pass the state notifier for selection
-                loadDueCards, // Pass the callback to reload cards on selection change
-              );
-            },
-          ),
-        ],
-      ),
-      // Set the body of the Scaffold to the content generated by buildBody.
-      body: buildBody(
-        context,
-        isLoadingState.value, // Pass current loading state
-        errorState.value, // Pass current error state
-        dueItemsState.value, // Pass list of due items
-        showEmptyState.value, // Pass empty state flag
-        selectedStackId, // Pass selected stack state
-        loadDueCards, // Pass the load function for retry/reload
-        isSessionComplete, // Pass session completion state
-        reviewedCards, // Pass reviewed cards map
-        dueItemsState, // Pass due items list state (needed for FlashcardView key?)
-        srsManager, // Pass the SRS manager instance
-        ref, // Pass the WidgetRef
+    return SafeArea(
+      top: false,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(l10n.learnAppBarTitle),
+          // Add actions to the AppBar.
+          actions: [
+            // Button to open the stack selector dialog.
+            IconButton(
+              icon: const Icon(Icons.filter_list), // Filter icon
+              tooltip: l10n.learnSelectStackTooltip,
+              onPressed: () {
+                // Call the function to show the stack selector dialog.
+                showStackSelector(
+                  context,
+                  ref,
+                  selectedStackId, // Pass the state notifier for selection
+                  loadDueCards, // Pass the callback to reload cards on selection change
+                );
+              },
+            ),
+          ],
+        ),
+        // Set the body of the Scaffold to the content generated by buildBody.
+        body: buildBody(
+          context,
+          isLoadingState.value, // Pass current loading state
+          errorState.value, // Pass current error state
+          dueItemsState.value, // Pass list of due items
+          showEmptyState.value, // Pass empty state flag
+          selectedStackId, // Pass selected stack state
+          loadDueCards, // Pass the load function for retry/reload
+          isSessionComplete, // Pass session completion state
+          reviewedCards, // Pass reviewed cards map
+          dueItemsState, // Pass due items list state (needed for FlashcardView key?)
+          srsManager, // Pass the SRS manager instance
+          ref, // Pass the WidgetRef
+        ),
       ),
     );
   }

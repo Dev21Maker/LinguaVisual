@@ -5,6 +5,7 @@ import 'signup_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // Keep for exception handling
 import '../../services/keep_signed_in_service.dart';
 import '../../providers/auth_provider.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -48,7 +49,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.message ?? 'Authentication error'),
+            content: Text(e.message ?? AppLocalizations.of(context)!.loginAuthError),
             backgroundColor: Colors.red,
           ),
         );
@@ -56,8 +57,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('An unexpected error occurred'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context)!.loginUnexpectedError),
             backgroundColor: Colors.red,
           ),
         );
@@ -71,6 +72,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -83,24 +86,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'Welcome Back',
+                    l10n.loginWelcomeBack,
                     style: Theme.of(context).textTheme.headlineMedium,
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 32),
                   TextFormField(
                     controller: _emailController,
-                    decoration: const InputDecoration(
-                      labelText: 'Email',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: l10n.loginEmailLabel,
+                      border: const OutlineInputBorder(),
                     ),
                     keyboardType: TextInputType.emailAddress,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please enter your email';
+                        return l10n.loginEmailEmptyValidation;
                       }
                       if (!value.contains('@')) {
-                        return 'Please enter a valid email';
+                        return l10n.loginEmailInvalidValidation;
                       }
                       return null;
                     },
@@ -108,14 +111,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _passwordController,
-                    decoration: const InputDecoration(
-                      labelText: 'Password',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: l10n.loginPasswordLabel,
+                      border: const OutlineInputBorder(),
                     ),
                     obscureText: true,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please enter your password';
+                        return l10n.loginPasswordEmptyValidation;
                       }
                       return null;
                     },
@@ -131,7 +134,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           });
                         },
                       ),
-                      const Text('Keep me signed in'),
+                      Text(l10n.loginKeepSignedIn),
                     ],
                   ),
                   const SizedBox(height: 24),
@@ -146,7 +149,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               color: Colors.white,
                             ),
                           )
-                        : const Text('Sign In'),
+                        : Text(l10n.loginSignInButton),
                   ),
                   const SizedBox(height: 16),
                   TextButton(
@@ -157,7 +160,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       );
                     },
-                    child: const Text('Don\'t have an account? Sign Up'),
+                    child: Text(l10n.loginSignUpPrompt),
                   ),
                 ],
               ),

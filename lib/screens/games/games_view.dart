@@ -1,15 +1,17 @@
-
 import 'package:flutter/material.dart';
 import 'package:lingua_visual/screens/games/srs/learn_screen.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class GamesView extends StatelessWidget {
   const GamesView({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Games'),
+        title: Text(l10n.gamesAppBarTitle),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -20,7 +22,7 @@ class GamesView extends StatelessWidget {
           children: [
             _buildGameCard(
               context,
-              'SRS Training',
+              l10n.gamesSrsTrainingTitle,
               Icons.school,
               Colors.blue,
               () => Navigator.of(context).push(
@@ -71,4 +73,3 @@ class GamesView extends StatelessWidget {
     );
   }
 }
-

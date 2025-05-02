@@ -63,7 +63,26 @@ class _FlashcardTileState extends State<FlashcardTile> {
                   Row(
                     mainAxisSize: MainAxisSize.max,
                     children: [
-                      Expanded(child: Text(widget.card.word, style: Theme.of(context).textTheme.titleLarge)),
+                      Expanded(child: Text(widget.card.word, overflow: TextOverflow.clip, style: Theme.of(context).textTheme.titleLarge)),
+                      SizedBox(width: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          IconButton(
+                            iconSize: 22,
+                            icon: const Icon(Icons.image),
+                            onPressed: _showImagePickerDialog,
+                            tooltip: 'Change image',
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.folder_shared),
+                            onPressed: () => widget.showMoveToStackDialog.call(),
+                            tooltip: 'Move to stack',
+                          ),
+                          const SizedBox(width: 16),
+                        ],
+                      ),
+                      SizedBox(width: 8),
                       Text(widget.getEmoji.call(), style: const TextStyle(fontSize: 20)),
                     ],
                   ),
@@ -78,6 +97,7 @@ class _FlashcardTileState extends State<FlashcardTile> {
                               (widget.translationVisible.value[widget.card.id] ?? false)
                                   ? Text(
                                     widget.card.translation,
+                                    overflow: TextOverflow.clip,
                                     key: ValueKey('shown_${widget.card.id}'),
                                     style: Theme.of(context).textTheme.bodyLarge,
                                   )
@@ -107,23 +127,7 @@ class _FlashcardTileState extends State<FlashcardTile> {
                 ],
               ),
             ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                IconButton(
-                  iconSize: 22,
-                  icon: const Icon(Icons.image),
-                  onPressed: _showImagePickerDialog,
-                  tooltip: 'Change image',
-                ),
-                IconButton(
-                  icon: const Icon(Icons.folder_shared),
-                  onPressed: () => widget.showMoveToStackDialog.call(),
-                  tooltip: 'Move to stack',
-                ),
-                const SizedBox(width: 8),
-              ],
-            ),
+
           ],
         ),
       ),

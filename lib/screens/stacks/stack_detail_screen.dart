@@ -3,6 +3,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:lingua_visual/providers/stack_provider.dart';
 import '../../models/flashcard_stack.dart';
 import '../../providers/flashcard_provider.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class StackDetailScreen extends ConsumerWidget {
   final FlashcardStack stack;
@@ -15,6 +16,7 @@ class StackDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final flashcardsAsync = ref.watch(flashcardsProvider);
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       appBar: AppBar(
@@ -22,6 +24,7 @@ class StackDetailScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.play_arrow),
+            tooltip: l10n.stackDetailStartPracticeTooltip,
             onPressed: () {
               // TODO: Start practice session with this stack's cards
             },
@@ -42,12 +45,12 @@ class StackDetailScreen extends ConsumerWidget {
                   const Icon(Icons.note_outlined, size: 64, color: Colors.grey),
                   const SizedBox(height: 16),
                   Text(
-                    'No flashcards in this stack',
+                    l10n.stackDetailEmptyTitle,
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Add flashcards to start practicing',
+                    l10n.stackDetailEmptySubtitle,
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ],
@@ -66,6 +69,7 @@ class StackDetailScreen extends ConsumerWidget {
                   subtitle: Text(flashcard.translation),
                   trailing: IconButton(
                     icon: const Icon(Icons.remove_circle_outline),
+                    tooltip: l10n.stackDetailRemoveCardTooltip,
                     onPressed: () {
                       ref.read(stacksProvider.notifier).removeFlashcardFromStack(
                         stack.id,
@@ -81,12 +85,13 @@ class StackDetailScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(
           child: Text(
-            'Error loading flashcards',
+            l10n.stackDetailErrorLoading,
             style: TextStyle(color: Theme.of(context).colorScheme.error),
           ),
         ),
       ),
       floatingActionButton: FloatingActionButton(
+        tooltip: l10n.stackDetailAddCardTooltip,
         onPressed: () {
           // TODO: Show dialog to add existing flashcards to this stack
         },

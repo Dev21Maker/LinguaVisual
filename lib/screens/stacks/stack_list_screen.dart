@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../../providers/stack_provider.dart';
 import 'stack_detail_screen.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class StackListScreen extends ConsumerWidget {
   const StackListScreen({super.key});
@@ -9,27 +10,28 @@ class StackListScreen extends ConsumerWidget {
   void _showCreateStackDialog(BuildContext context, WidgetRef ref) {
     final nameController = TextEditingController();
     final descriptionController = TextEditingController();
+    final l10n = AppLocalizations.of(context)!;
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Create New Stack'),
+        title: Text(l10n.stackListCreateDialogTitle),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'Stack Name',
-                hintText: 'Enter stack name',
+              decoration: InputDecoration(
+                labelText: l10n.stackListCreateNameLabel,
+                hintText: l10n.stackListCreateNameHint,
               ),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: descriptionController,
-              decoration: const InputDecoration(
-                labelText: 'Description',
-                hintText: 'Enter stack description',
+              decoration: InputDecoration(
+                labelText: l10n.stackListCreateDescLabel,
+                hintText: l10n.stackListCreateDescHint,
               ),
               maxLines: 3,
             ),
@@ -38,7 +40,7 @@ class StackListScreen extends ConsumerWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('CANCEL'),
+            child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
           ),
           TextButton(
             onPressed: () {
@@ -50,7 +52,7 @@ class StackListScreen extends ConsumerWidget {
                 Navigator.pop(context);
               }
             },
-            child: const Text('CREATE'),
+            child: Text(l10n.stackListCreateButton),
           ),
         ],
       ),
@@ -60,10 +62,11 @@ class StackListScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final stacksAsync = ref.watch(stacksProvider);
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Flashcard Stacks'),
+        title: Text(l10n.stackListAppBarTitle),
       ),
       body: stacksAsync.when(
         data: (stacks) => stacks.isEmpty
@@ -74,19 +77,20 @@ class StackListScreen extends ConsumerWidget {
                     const Icon(Icons.folder_outlined, size: 64, color: Colors.grey),
                     const SizedBox(height: 16),
                     Text(
-                      'No stacks yet',
+                      l10n.stackListEmptyTitle,
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Create a stack to organize your flashcards',
+                      l10n.stackListEmptySubtitle,
                       style: Theme.of(context).textTheme.bodyMedium,
+                      textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 24),
                     ElevatedButton.icon(
                       onPressed: () => _showCreateStackDialog(context, ref),
                       icon: const Icon(Icons.add),
-                      label: const Text('Create Stack'),
+                      label: Text(l10n.stackListEmptyButton),
                     ),
                   ],
                 ),
@@ -101,7 +105,7 @@ class StackListScreen extends ConsumerWidget {
                       leading: const Icon(Icons.folder),
                       title: Text(stack.name),
                       subtitle: Text(
-                        '${stack.flashcardIds.length} cards • ${stack.description}',
+                        l10n.stackListCardSubtitle(stack.flashcardIds.length, stack.description),
                       ),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () {
@@ -119,12 +123,13 @@ class StackListScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(
           child: Text(
-            'Error loading stacks',
+            l10n.stackListErrorLoading,
             style: TextStyle(color: Theme.of(context).colorScheme.error),
           ),
         ),
       ),
       floatingActionButton: FloatingActionButton(
+        tooltip: l10n.stackListCreateFabTooltip,
         onPressed: () => _showCreateStackDialog(context, ref),
         child: const Icon(Icons.add),
       ),

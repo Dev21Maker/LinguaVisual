@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:lingua_visual/providers/statistics_provider.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class ProgressScreen extends ConsumerWidget {
   const ProgressScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Progress'),
+        title: Text(l10n.progressAppBarTitle),
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
@@ -20,7 +23,7 @@ class ProgressScreen extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Statistics',
+                    l10n.progressStatisticsTitle,
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
                   const SizedBox(height: 16),
@@ -36,6 +39,7 @@ class ProgressScreen extends ConsumerWidget {
 
   Widget _buildStatisticsSection(BuildContext context, WidgetRef ref) {
     final statisticsAsync = ref.watch(statisticsProvider);
+    final l10n = AppLocalizations.of(context)!;
 
     return statisticsAsync.when(
       data: (stats) => Wrap(
@@ -44,28 +48,28 @@ class ProgressScreen extends ConsumerWidget {
         children: [
           _buildStatCard(
             context,
-            'Total Cards',
+            l10n.progressStatTotalCards,
             stats.totalCards.toString(),
             Icons.school,
             Colors.blue,
           ),
           _buildStatCard(
             context,
-            'Due Today',
+            l10n.progressStatDueToday,
             stats.dueToday.toString(),
             Icons.access_time,
             Colors.orange,
           ),
           _buildStatCard(
             context,
-            'Learned Today',
+            l10n.progressStatLearnedToday,
             stats.learnedToday.toString(),
             Icons.check_circle,
             Colors.green,
           ),
           _buildStatCard(
             context,
-            'Streak',
+            l10n.progressStatStreak,
             stats.streak.toString(),
             Icons.local_fire_department,
             Colors.red,
@@ -75,7 +79,7 @@ class ProgressScreen extends ConsumerWidget {
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) => Center(
         child: Text(
-          'Error loading statistics',
+          l10n.progressErrorLoading,
           style: TextStyle(color: Theme.of(context).colorScheme.error),
         ),
       ),
@@ -116,6 +120,4 @@ class ProgressScreen extends ConsumerWidget {
       ),
     );
   }
-
-
 }

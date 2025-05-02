@@ -10,6 +10,7 @@ import 'package:lingua_visual/providers/stack_provider.dart';
 import 'package:lingua_visual/widgets/flashcard_tile.dart';
 import 'package:lingua_visual/widgets/flashcards_builder.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class FlashcardScreen extends HookConsumerWidget {
   const FlashcardScreen({super.key});
@@ -28,29 +29,36 @@ class FlashcardScreen extends HookConsumerWidget {
   void _showCreateStackDialog(BuildContext context, WidgetRef ref) {
     final nameController = TextEditingController();
     final descriptionController = TextEditingController();
+    final l10n = AppLocalizations.of(context)!;
 
     showDialog(
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('Create New Stack'),
+            title: Text(l10n.flashcardsCreateStackDialogTitle),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
                   controller: nameController,
-                  decoration: const InputDecoration(labelText: 'Stack Name', hintText: 'Enter stack name'),
+                  decoration: InputDecoration(
+                    labelText: l10n.flashcardsStackNameLabel,
+                    hintText: l10n.flashcardsStackNameHint,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 TextField(
                   controller: descriptionController,
-                  decoration: const InputDecoration(labelText: 'Description', hintText: 'Enter stack description'),
+                  decoration: InputDecoration(
+                    labelText: l10n.flashcardsStackDescriptionLabel,
+                    hintText: l10n.flashcardsStackDescriptionHint,
+                  ),
                   maxLines: 3,
                 ),
               ],
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCEL')),
+              TextButton(onPressed: () => Navigator.pop(context), child: Text(l10n.commonCancel)),
               TextButton(
                 onPressed: () {
                   if (nameController.text.isNotEmpty) {
@@ -58,7 +66,7 @@ class FlashcardScreen extends HookConsumerWidget {
                     Navigator.pop(context);
                   }
                 },
-                child: const Text('CREATE'),
+                child: Text(l10n.commonCreate),
               ),
             ],
           ),
@@ -66,11 +74,13 @@ class FlashcardScreen extends HookConsumerWidget {
   }
 
   void _showMoveToStackDialog(BuildContext context, WidgetRef ref, Flashcard card, String? currentStackId) {
+    final l10n = AppLocalizations.of(context)!;
+
     showDialog(
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('Move to Stack'),
+            title: Text(l10n.flashcardsMoveToStackDialogTitle),
             content: ref
                 .watch(stacksProvider)
                 .when(
@@ -81,7 +91,7 @@ class FlashcardScreen extends HookConsumerWidget {
                         if (currentStackId != null)
                           ListTile(
                             leading: const Icon(Icons.remove_circle_outline, color: Colors.red),
-                            title: const Text('Remove from current stack'),
+                            title: Text(l10n.flashcardsRemoveFromCurrentStack),
                             onTap: () {
                               ref.read(stacksProvider.notifier).removeFlashcardFromStack(currentStackId, card.id);
                               Navigator.pop(context);
@@ -89,7 +99,7 @@ class FlashcardScreen extends HookConsumerWidget {
                           ),
                         if (currentStackId != null) const Divider(),
                         if (stacks.isEmpty)
-                          const Text('No stacks available. Create a stack first.')
+                          Text(l10n.flashcardsNoStacksAvailable)
                         else
                           SizedBox(
                             width: double.maxFinite,
@@ -123,9 +133,9 @@ class FlashcardScreen extends HookConsumerWidget {
                     );
                   },
                   loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (error, _) => Text('Error: $error'),
+                  error: (error, _) => Text('${l10n.commonError}: $error'),
                 ),
-            actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('CLOSE'))],
+            actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text(l10n.commonCancel))],
           ),
     );
   }
@@ -137,15 +147,13 @@ class FlashcardScreen extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
     final selectedStackId = useState<String?>(null);
     final stacksAsync = ref.watch(stacksProvider);
     final flashcardsAsync = ref.watch(flashcardStateProvider);
-    // Track per-card translation visibility
     final translationVisible = useState<Map<String, bool>>({});
-    // Add this state
     final isReversed = useState<bool>(false);
 
-    // Load the preference when the widget is built
     useEffect(() {
       SharedPreferences.getInstance().then((prefs) {
         isReversed.value = prefs.getBool('flashcards_reversed') ?? false;
@@ -153,14 +161,13 @@ class FlashcardScreen extends HookConsumerWidget {
       return null;
     }, []);
 
-    // Add this function to save the preference
     Future<void> toggleOrder() async {
       final prefs = await SharedPreferences.getInstance();
       isReversed.value = !isReversed.value;
       await prefs.setBool('flashcards_reversed', isReversed.value);
     }
 
-    void _changeTranslationVisibility(String id) =>
+    void changeTranslationVisibility(String id) =>
         translationVisible.value = {...translationVisible.value, id: !(translationVisible.value[id] ?? false)};
 
     return Scaffold(
@@ -171,7 +178,7 @@ class FlashcardScreen extends HookConsumerWidget {
               child: stacksAsync.when(
                 data: (stacks) {
                   if (selectedStackId.value == null) {
-                    return const Text('All Flashcards');
+                    return Text(l10n.flashcardsAllFlashcardsDropdown);
                   }
                   final selectedStack = stacks.firstWhere(
                     (stack) => stack.id == selectedStackId.value,
@@ -179,7 +186,7 @@ class FlashcardScreen extends HookConsumerWidget {
                       selectedStackId.value = null;
                       return FlashcardStack(
                         id: '',
-                        name: 'All Flashcards',
+                        name: l10n.flashcardsAllFlashcardsDropdown,
                         description: '',
                         flashcardIds: [],
                         createdAt: DateTime.now(),
@@ -188,22 +195,23 @@ class FlashcardScreen extends HookConsumerWidget {
                   );
                   return Text(selectedStack.name);
                 },
-                loading: () => const Text('Loading...'),
-                error: (_, __) => const Text('Flashcards'),
+                loading: () => Text(l10n.flashcardsLoadingStacks),
+                error: (_, __) => Text(l10n.flashcardsAppBarTitle),
               ),
             ),
             // Add menu button here
             PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert),
-              tooltip: 'Sort options',
+              tooltip: l10n.flashcardsReverseOrderTooltip,
               onSelected: (value) {
                 switch (value) {
                   case 'toggle_order':
                     toggleOrder();
                     break;
                   case 'refresh':
-                    ref.refresh(flashcardStateProvider); // Corrected provider & assigned result
-                    ref.refresh(stacksProvider); // Assigned result
+                    // Discard the result but still call refresh
+                    ref.refresh(flashcardStateProvider);
+                    ref.refresh(stacksProvider);
                     break;
                 }
               },
@@ -219,7 +227,7 @@ class FlashcardScreen extends HookConsumerWidget {
                             color: Theme.of(context).iconTheme.color,
                           ),
                           const SizedBox(width: 8),
-                          Text(isReversed.value ? 'Oldest' : 'Latest'),
+                          Text(isReversed.value ? l10n.commonCancel : l10n.commonCreate),
                         ],
                       ),
                     ),
@@ -229,7 +237,7 @@ class FlashcardScreen extends HookConsumerWidget {
                         children: [
                           Icon(Icons.refresh, size: 20, color: Theme.of(context).iconTheme.color),
                           const SizedBox(width: 8),
-                          const Text('Refresh'),
+                          Text(l10n.commonRetry),
                         ],
                       ),
                     ),
@@ -249,14 +257,14 @@ class FlashcardScreen extends HookConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Flashcard Stacks', style: TextStyle(color: Colors.white, fontSize: 24)),
+                        Text(l10n.stackListAppBarTitle, style: const TextStyle(color: Colors.white, fontSize: 24)),
                         const SizedBox(height: 8),
-                        Text('${stacks.length} Stacks', style: const TextStyle(color: Colors.white70)),
+                        Text('${stacks.length} stacks', style: const TextStyle(color: Colors.white70)),
                         const Spacer(),
                         ElevatedButton.icon(
                           onPressed: () => _showCreateStackDialog(context, ref),
                           icon: const Icon(Icons.add),
-                          label: const Text('Create New Stack'),
+                          label: Text(l10n.flashcardsCreateStackMenuItem),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.white,
                             foregroundColor: Theme.of(context).primaryColor,
@@ -267,7 +275,7 @@ class FlashcardScreen extends HookConsumerWidget {
                   ),
                   ListTile(
                     leading: const Icon(Icons.all_inclusive),
-                    title: const Text('All Flashcards'),
+                    title: Text(l10n.flashcardsAllFlashcardsDropdown),
                     selected: selectedStackId.value == null,
                     onTap: () {
                       selectedStackId.value = null;
@@ -276,10 +284,10 @@ class FlashcardScreen extends HookConsumerWidget {
                   ),
                   const Divider(),
                   if (stacks.isEmpty)
-                    const ListTile(
-                      leading: Icon(Icons.info_outline),
-                      title: Text('No stacks yet'),
-                      subtitle: Text('Create a stack to organize your flashcards'),
+                    ListTile(
+                      leading: const Icon(Icons.info_outline),
+                      title: Text(l10n.stackListEmptyTitle),
+                      subtitle: Text(l10n.stackListEmptySubtitle),
                     )
                   else
                     ...stacks.map(
@@ -297,18 +305,16 @@ class FlashcardScreen extends HookConsumerWidget {
                             context: context,
                             builder:
                                 (context) => AlertDialog(
-                                  title: const Text('Delete Stack'),
-                                  content: Text(
-                                    'Are you sure you want to delete the stack "${stack.name}"? This will not delete the flashcards.',
-                                  ),
+                                  title: Text(l10n.commonCancel),
+                                  content: Text('Are you sure you want to delete ${stack.name}?'),
                                   actions: [
                                     TextButton(
                                       onPressed: () => Navigator.of(context).pop(false),
-                                      child: const Text('CANCEL'),
+                                      child: Text(l10n.commonCancel),
                                     ),
                                     TextButton(
                                       onPressed: () => Navigator.of(context).pop(true),
-                                      child: const Text('DELETE', style: TextStyle(color: Colors.red)),
+                                      child: Text(l10n.commonCreate, style: const TextStyle(color: Colors.red)),
                                     ),
                                   ],
                                 ),
@@ -320,7 +326,7 @@ class FlashcardScreen extends HookConsumerWidget {
                         child: ListTile(
                           leading: const Icon(Icons.folder),
                           title: Text(stack.name),
-                          subtitle: Text('${stack.flashcardIds.length} cards'),
+                          subtitle: Text(l10n.stackListCardSubtitle(stack.flashcardIds.length, stack.description)),
                           selected: selectedStackId.value == stack.id,
                           onTap: () {
                             selectedStackId.value = stack.id;
@@ -334,13 +340,12 @@ class FlashcardScreen extends HookConsumerWidget {
           loading: () => const Center(child: CircularProgressIndicator()),
           error:
               (error, _) => Center(
-                child: Text('Error loading stacks', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                child: Text(l10n.stackListErrorLoading, style: TextStyle(color: Theme.of(context).colorScheme.error)),
               ),
         ),
       ),
       body: flashcardsAsync.when(
         data: (flashcards) {
-          // Filter flashcards based on selected stack
           final filteredFlashcards =
               selectedStackId.value != null
                   ? flashcards.where((card) {
@@ -352,7 +357,6 @@ class FlashcardScreen extends HookConsumerWidget {
                   }).toList()
                   : flashcards;
 
-          // Apply the reverse order if needed
           final displayedFlashcards = isReversed.value ? filteredFlashcards.reversed.toList() : filteredFlashcards;
 
           if (displayedFlashcards.isEmpty) {
@@ -362,10 +366,10 @@ class FlashcardScreen extends HookConsumerWidget {
                 children: [
                   const Icon(Icons.school_outlined, size: 64, color: Colors.grey),
                   const SizedBox(height: 16),
-                  Text('No flashcards available', style: Theme.of(context).textTheme.titleLarge),
+                  Text(l10n.flashcardsNoFlashcards, style: Theme.of(context).textTheme.titleLarge),
                   const SizedBox(height: 8),
                   Text(
-                    'Add some flashcards to get started',
+                    l10n.flashcardsAddSomeFlashcards,
                     style: Theme.of(context).textTheme.bodyMedium,
                     textAlign: TextAlign.center,
                   ),
@@ -381,7 +385,7 @@ class FlashcardScreen extends HookConsumerWidget {
               return FlashcardTile(
                 card: card,
                 translationVisible: translationVisible,
-                changeTranslationVisibility: (p0) => _changeTranslationVisibility(p0),
+                changeTranslationVisibility: (p0) => changeTranslationVisibility(p0),
                 showMoveToStackDialog: () => _showMoveToStackDialog(context, ref, card, selectedStackId.value),
                 getEmoji: () {
                   if (ref.read(isOnlineProvider.notifier).state) {
@@ -403,10 +407,10 @@ class FlashcardScreen extends HookConsumerWidget {
                 children: [
                   const Icon(Icons.error_outline, size: 64, color: Colors.red),
                   const SizedBox(height: 16),
-                  Text('Error loading flashcards', style: Theme.of(context).textTheme.titleLarge),
+                  Text(l10n.flashcardsErrorLoadingFlashcards, style: Theme.of(context).textTheme.titleLarge),
                   const SizedBox(height: 8),
                   Text(
-                    error.toString(),
+                    l10n.flashcardsGenericError,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.error),
                     textAlign: TextAlign.center,
                   ),

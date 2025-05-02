@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../providers/auth_provider.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class SignUpScreen extends ConsumerStatefulWidget {
   const SignUpScreen({super.key});
@@ -37,27 +38,30 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         password: _passwordController.text.trim(),
       );
       if (mounted) {
+        final l10n = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Account created! Please check your email to verify.'),
+          SnackBar(
+            content: Text(l10n.signUpSuccessMessage),
           ),
         );
         Navigator.of(context).pop(); // Return to login screen
       }
     } on FirebaseAuthException catch (e) {
       if (mounted) {
+        final l10n = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.toString()),
+            content: Text(l10n.signUpAuthError),
             backgroundColor: Colors.red,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
+        final l10n = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('An error occurred'),
+          SnackBar(
+            content: Text(l10n.signUpUnexpectedError),
             backgroundColor: Colors.red,
           ),
         );
@@ -71,9 +75,11 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sign Up'),
+        title: Text(l10n.signUpAppBarTitle),
       ),
       body: SafeArea(
         child: Center(
@@ -86,24 +92,24 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'Create Account',
+                    l10n.signUpCreateAccountHeadline,
                     style: Theme.of(context).textTheme.headlineMedium,
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 32),
                   TextFormField(
                     controller: _emailController,
-                    decoration: const InputDecoration(
-                      labelText: 'Email',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: l10n.signUpEmailLabel,
+                      border: const OutlineInputBorder(),
                     ),
                     keyboardType: TextInputType.emailAddress,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please enter your email';
+                        return l10n.signUpEmailEmptyValidation;
                       }
                       if (!value.contains('@')) {
-                        return 'Please enter a valid email';
+                        return l10n.signUpEmailInvalidValidation;
                       }
                       return null;
                     },
@@ -111,17 +117,17 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _passwordController,
-                    decoration: const InputDecoration(
-                      labelText: 'Password',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: l10n.signUpPasswordLabel,
+                      border: const OutlineInputBorder(),
                     ),
                     obscureText: true,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please enter a password';
+                        return l10n.signUpPasswordEmptyValidation;
                       }
                       if (value.length < 6) {
-                        return 'Password must be at least 6 characters';
+                        return l10n.signUpPasswordLengthValidation;
                       }
                       return null;
                     },
@@ -129,17 +135,17 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _confirmPasswordController,
-                    decoration: const InputDecoration(
-                      labelText: 'Confirm Password',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: l10n.signUpConfirmPasswordLabel,
+                      border: const OutlineInputBorder(),
                     ),
                     obscureText: true,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please confirm your password';
+                        return l10n.signUpConfirmPasswordEmptyValidation;
                       }
                       if (value != _passwordController.text) {
-                        return 'Passwords do not match';
+                        return l10n.signUpPasswordsDoNotMatchValidation;
                       }
                       return null;
                     },
@@ -156,7 +162,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                               color: Colors.white,
                             ),
                           )
-                        : const Text('Sign Up'),
+                        : Text(l10n.signUpButton),
                   ),
                 ],
               ),

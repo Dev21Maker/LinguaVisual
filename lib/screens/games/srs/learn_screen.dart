@@ -347,51 +347,50 @@ class LearnScreen extends HookConsumerWidget {
         flashcards: dueFlashcards,
         // Callback executed when the user selects a rating ('Quick', 'Good', 'Hard').
         onRatingSelected: (rating, flashcard) async {
-          // Find the SRS item corresponding to the rated flashcard.
-          final srsItem = dueItems.firstWhere(
-            (item) => item.id == flashcard.id,
-          );
-          if (srsItem == null) {
-            debugPrint("Error: Couldn't find SrsItem for rated flashcard: ${flashcard.id}");
-            return;
-          }
-          // Map the UI rating ('Quick', 'Good', 'Hard') to an SRS response string ('quick', 'got_it', 'missed').
-          String response;
+          // Map the button label to the SRS rating format
+          // The expected values for AdaptiveFlow are 'quick', 'got', 'missed'
+          String srsRating;
           switch (rating) {
-            case 'Quick':
-              response = 'quick'; 
+            case 'Lucky Guess':
+              srsRating = 'quick';  // Maps to "Quick" in AdaptiveFlow
               break;
-            case 'Good':
-              response = 'got_it';
+            case 'Got It':
+              srsRating = 'got';    // Maps to "Got It" in AdaptiveFlow
               break;
-            case 'Hard': // Assuming 'Hard' maps to 'missed' for SRS
+            case 'Missed':
+              srsRating = 'missed'; // Maps to "Missed" in AdaptiveFlow
+              break;
             default:
-              response = 'missed';
-              break;
+              srsRating = 'got';    // Default fallback
           }
+
+          debugPrint('Processing answer for card ${flashcard.id} with rating: $srsRating');
+          debugPrint('BEFORE - Next review: ${DateTime.fromMillisecondsSinceEpoch(flashcard.srsNextReviewDate).toIso8601String()}, PDF: ${flashcard.srsEaseFactor}, Interval: ${flashcard.srsInterval}');
           
-          // Determine the review type (e.g., multiple choice, typing). Needs actual logic.
-          final reviewType = 'mc'; // Example: Replace with actual review type logic
-          
-          // Record the review in the SRS manager, which calculates the next review date, etc.
-          final updatedItem = srsManager.recordReview(
+          // Process the answer in the SRS system
+          final updatedItem = await srsManager.recordReview(
             flashcard.id, 
-            response, // Pass the mapped response string
-            reviewType: reviewType // Use named parameter for reviewType
+            srsRating,
+            reviewType: "mc"
           );
           
           // If the SRS manager successfully processed the review:
           if (updatedItem != null) {
+            debugPrint('AFTER - Next review: ${DateTime.fromMillisecondsSinceEpoch(updatedItem.nextReview).toIso8601String()}, PDF: ${updatedItem.pdf}, Interval: ${updatedItem.lastInterval}');
+            
             // --- Update Flashcard State (Online Provider) ---
             // Get the current state of online flashcards.
             final onlineFlashcardsState = ref.read(flashcardStateProvider);
             if (onlineFlashcardsState.hasValue) {
-              // Find the specific flashcard object to update.
-              final cardToUpdate = onlineFlashcardsState.value!.firstWhere(
-                (card) => card.id == flashcard.id,
+              // First check if the flashcard exists in the current state
+              final cardIndex = onlineFlashcardsState.value!.indexWhere(
+                (card) => card.id == flashcard.id
               );
               
-              if (cardToUpdate != null) {
+              if (cardIndex >= 0) {
+                // Card exists, create an updated version
+                final cardToUpdate = onlineFlashcardsState.value![cardIndex];
+                
                 // Create an updated flashcard object with new SRS data.
                 final updatedCard = cardToUpdate.copyWith(
                   srsInterval: updatedItem.lastInterval, 
@@ -402,8 +401,13 @@ class LearnScreen extends HookConsumerWidget {
                   srsQuickStreak: updatedItem.streakQuick,
                   srsIsInLearningPhase: updatedItem.box != null,
                 );
+                
+                debugPrint('Updating flashcard: ${updatedCard.word} with new next review date: ${DateTime.fromMillisecondsSinceEpoch(updatedCard.srsNextReviewDate).toIso8601String()}');
+                
                 // Persist the updated flashcard using the provider (handles sync + offline cache).
                 await ref.read(flashcardStateProvider.notifier).updateFlashcard(updatedCard);
+              } else {
+                debugPrint('Error: Could not find card ${flashcard.id} to update in flashcard provider');
               }
             }
             

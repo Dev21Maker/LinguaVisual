@@ -318,8 +318,22 @@ class _FlashcardViewState extends State<FlashcardView> {
       width: isLonger? 100 : 90,
       child: ElevatedButton(
         onPressed: () {
-          widget.onRatingSelected(label, flashcard);
+          // First trigger the swipe animation - do this before modifying the list
           controller.swipe(direction);
+          
+          // Small delay to allow animation to start before modifying the list
+          Future.delayed(const Duration(milliseconds: 100), () {
+            // Then notify parent about the rating (which will update SRS and modify the list)
+            widget.onRatingSelected(label, flashcard);
+          });
+          
+          print("${flashcard.word} : I: ${flashcard.srsInterval}, N: ${DateTime.fromMillisecondsSinceEpoch(flashcard.srsNextReviewDate).toIso8601String()}, B: ${flashcard.srsBaseIntervalIndex}, Q: ${flashcard.srsQuickStreak}");
+          // Reset card state
+          setState(() {
+            flippedCards[flashcard.id] = false;
+            translationVisible[flashcard.id] = false;
+            hasCheckedAnswer[flashcard.id] = false;
+          });
         },
         style: ElevatedButton.styleFrom(
           backgroundColor: color.withOpacity(0.8),

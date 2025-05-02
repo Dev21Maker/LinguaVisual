@@ -77,7 +77,7 @@ class LearnScreen extends HookConsumerWidget {
         if (selectedStackId.value != null) {
           try {
             final stack = ref.read(stacksProvider.notifier).getStackById(selectedStackId.value!);
-            filteredFlashcards = flashcards; //.where((card) => stack.flashcardIds.contains(card.id)).toList();
+            filteredFlashcards = flashcards.where((card) => stack.flashcardIds.contains(card.id)).toList();
             debugPrint('Filtered flashcards length: ${filteredFlashcards.length}');
             debugPrint('Filtered flashcards first: ${filteredFlashcards.first}');
           } catch (e) {
@@ -96,18 +96,18 @@ class LearnScreen extends HookConsumerWidget {
         }
         
         // Get due items
-        final dueItems = srsManager.getAllItemsSortedByNextReview();
+        final dueItems = srsManager.getDueItems(now: DateTime.now().millisecondsSinceEpoch);
         dueItemsState.value = dueItems;
         
         // // Show load more option if no due items but we have flashcards
-        // if (dueItems.isEmpty && filteredFlashcards.isNotEmpty) {
-        //   showLoadMoreOption.value = true;
-        // }
+        if (dueItems.isEmpty && filteredFlashcards.isNotEmpty) {
+          showLoadMoreOption.value = true;
+        }
         
         // // Show empty state if no due items and no load more option
-        // if (dueItems.isEmpty && !showLoadMoreOption.value) {
-        //   showEmptyState.value = true;
-        // }
+        if (dueItems.isEmpty && !showLoadMoreOption.value) {
+          showEmptyState.value = true;
+        }
         
       } catch (e) {
         errorState.value = e.toString();

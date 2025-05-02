@@ -17,8 +17,12 @@ class FlashcardItem {
   /// The answer or back side of the flashcard.
   final String answer;
 
-  /// The interval in days until the next review.
+  /// The interval in days used in the *last* calculation.
+  /// This might be superseded by baseIntervalIndex for future calculations.
   int interval;
+
+  /// The index into the predefined base interval sequence (e.g., 0 for 1h, 1 for 5h, etc.).
+  int baseIntervalIndex;
 
   /// The Personal Difficulty Factor (PDF) reflecting the perceived difficulty of the card.
   /// Lower values mean the card is easier, higher values mean it's harder.
@@ -27,6 +31,9 @@ class FlashcardItem {
 
   /// The number of times this card has been reviewed.
   int reviews;
+
+  /// The date when the card was last reviewed.
+  DateTime? lastReviewDate;
 
   /// The date when this card is due for review.
   DateTime nextReviewDate;
@@ -51,6 +58,10 @@ class FlashcardItem {
   /// Set to true when a card is missed and needs additional reinforcement.
   bool isPriority;
 
+  /// Tracks the number of times this card has been repeated on the current day.
+  /// Used to implement same-day repetition for missed items.
+  int repeatedToday;
+
   /// Creates a new flashcard item.
   ///
   /// If [id] is not provided, a UUID will be generated.
@@ -61,14 +72,17 @@ class FlashcardItem {
     required this.question,
     required this.answer,
     this.interval = 0,
+    this.baseIntervalIndex = 0,
     this.personalDifficultyFactor = 1.0,
     this.reviews = 0,
+    this.lastReviewDate,
     DateTime? nextReviewDate,
     this.quickStreak = 0,
     this.lastReviewType,
     this.isInLearningPhase = true,
     this.learningPhaseProgress = 0,
     this.isPriority = false,
+    this.repeatedToday = 0,
   }) : 
     this.id = id ?? const Uuid().v4(),
     this.nextReviewDate = nextReviewDate ?? DateTime.now();
@@ -80,14 +94,17 @@ class FlashcardItem {
     String? question,
     String? answer,
     int? interval,
+    int? baseIntervalIndex,
     double? personalDifficultyFactor,
     int? reviews,
+    DateTime? lastReviewDate,
     DateTime? nextReviewDate,
     int? quickStreak,
     String? lastReviewType,
     bool? isInLearningPhase,
     int? learningPhaseProgress,
     bool? isPriority,
+    int? repeatedToday,
   }) {
     return FlashcardItem(
       id: id ?? this.id,
@@ -95,14 +112,17 @@ class FlashcardItem {
       question: question ?? this.question,
       answer: answer ?? this.answer,
       interval: interval ?? this.interval,
+      baseIntervalIndex: baseIntervalIndex ?? this.baseIntervalIndex,
       personalDifficultyFactor: personalDifficultyFactor ?? this.personalDifficultyFactor,
       reviews: reviews ?? this.reviews,
+      lastReviewDate: lastReviewDate ?? this.lastReviewDate,
       nextReviewDate: nextReviewDate ?? this.nextReviewDate,
       quickStreak: quickStreak ?? this.quickStreak,
       lastReviewType: lastReviewType ?? this.lastReviewType,
       isInLearningPhase: isInLearningPhase ?? this.isInLearningPhase,
       learningPhaseProgress: learningPhaseProgress ?? this.learningPhaseProgress,
       isPriority: isPriority ?? this.isPriority,
+      repeatedToday: repeatedToday ?? this.repeatedToday,
     );
   }
 
@@ -114,14 +134,17 @@ class FlashcardItem {
       'question': question,
       'answer': answer,
       'interval': interval,
+      'baseIntervalIndex': baseIntervalIndex,
       'personalDifficultyFactor': personalDifficultyFactor,
       'reviews': reviews,
+      'lastReviewDate': lastReviewDate?.toIso8601String(),
       'nextReviewDate': nextReviewDate.toIso8601String(),
       'quickStreak': quickStreak,
       'lastReviewType': lastReviewType,
       'isInLearningPhase': isInLearningPhase,
       'learningPhaseProgress': learningPhaseProgress,
       'isPriority': isPriority,
+      'repeatedToday': repeatedToday,
     };
   }
 
@@ -133,14 +156,17 @@ class FlashcardItem {
       question: json['question'],
       answer: json['answer'],
       interval: json['interval'],
+      baseIntervalIndex: json['baseIntervalIndex'] ?? 0,
       personalDifficultyFactor: json['personalDifficultyFactor'],
       reviews: json['reviews'],
+      lastReviewDate: json['lastReviewDate'] != null ? DateTime.parse(json['lastReviewDate']) : null,
       nextReviewDate: DateTime.parse(json['nextReviewDate']),
       quickStreak: json['quickStreak'] ?? 0,
       lastReviewType: json['lastReviewType'],
       isInLearningPhase: json['isInLearningPhase'] ?? true,
       learningPhaseProgress: json['learningPhaseProgress'] ?? 0,
       isPriority: json['isPriority'] ?? false,
+      repeatedToday: json['repeatedToday'] ?? 0,
     );
   }
 }

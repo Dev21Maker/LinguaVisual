@@ -3,21 +3,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:lingua_visual/package/models/flashcard_item.dart';
-// import 'package:multi_language_srs/multi_language_srs.dart';
+import 'package:lingua_visual/models/flashcard.dart';
 
 class FlashcardView extends StatefulWidget {
-  final List<FlashcardItem> flashcards;
-  final Function(String, FlashcardItem) onRatingSelected;
+  final List<Flashcard> flashcards;
+  final Function(String, Flashcard) onRatingSelected;
   final String? imageUrl;
-  final bool showTranslation; // Add this new parameter
+  final bool showTranslation;
 
   const FlashcardView({
     super.key,
     required this.flashcards,
     required this.onRatingSelected,
     this.imageUrl,
-    this.showTranslation = true, // Default to true for backward compatibility
+    this.showTranslation = true,
   });
 
   @override
@@ -27,23 +26,13 @@ class FlashcardView extends StatefulWidget {
 class _FlashcardViewState extends State<FlashcardView> {
   final CardSwiperController controller = CardSwiperController();
   final Map<String, bool> flippedCards = {};
-  final Map<String, bool> translationVisible = {};
+  bool isTranslationVisible = false;
   final Map<String, bool> hasCheckedAnswer = {};
 
   @override
   void dispose() {
     controller.dispose();
     super.dispose();
-  }
-
-  void _toggleCard(String cardId) {
-    setState(() {
-      flippedCards[cardId] = !(flippedCards[cardId] ?? false);
-      if (!(flippedCards[cardId] ?? false)) {
-        translationVisible[cardId] = false;
-        hasCheckedAnswer[cardId] = false;
-      }
-    });
   }
 
   @override
@@ -57,28 +46,70 @@ class _FlashcardViewState extends State<FlashcardView> {
       cardsCount: widget.flashcards.length,
       numberOfCardsDisplayed: 1,
       cardBuilder: (context, index, percentThresholdX, percentThresholdY) {
-        // Add bounds check to prevent index out of range
         if (index >= widget.flashcards.length) {
-          return const SizedBox.shrink(); // Return empty widget for invalid indices
+          print("Index out of bounds: $index/${widget.flashcards.length}");
+          return const SizedBox.shrink();
         }
-        return _buildFlashcard(widget.flashcards[index]);
+        return FlashcardBuildItemView(
+          controller: controller,
+          onRatingSelected: widget.onRatingSelected,
+          flashcard: widget.flashcards[index],
+          imageUrl: widget.imageUrl,
+        );
       },
       onSwipe: (previousIndex, currentIndex, direction) {
-        return true;
+        if (currentIndex == null || currentIndex >= widget.flashcards.length) {
+          print("Swipe resulted in invalid currentIndex: $currentIndex");
+          return false;
+        }
+        return false;
       },
       backCardOffset: const Offset(40, 40),
       padding: const EdgeInsets.all(24.0),
     );
   }
+}
 
-  Widget _buildFlashcard(FlashcardItem flashcard) {
+class FlashcardBuildItemView extends StatefulWidget {
+  const FlashcardBuildItemView({
+    required this.flashcard,
+    required this.imageUrl,
+    required this.controller,
+    required this.onRatingSelected,
+    super.key,
+  });
+
+  final Flashcard flashcard;
+  final String? imageUrl;
+  final CardSwiperController controller;
+  final Function(String, Flashcard) onRatingSelected;
+
+  @override
+  State<FlashcardBuildItemView> createState() => _FlashcardBuildItemViewState();
+}
+
+class _FlashcardBuildItemViewState extends State<FlashcardBuildItemView> {
+  Flashcard get flashcard => widget.flashcard;
+
+  bool isCardFlipped = false;
+  bool isTranslationVisible = false;
+  bool hasCheckedAnswer = false;
+
+  @override
+  Widget build(BuildContext context) {
+    // Determine if this card should be shown reversed (back first)
+    // When card is in box 3+ (higher learning stage), show back first
+    final bool shouldShowReversed =
+        flashcard.srsIsInLearningPhase && flashcard.srsBaseIntervalIndex >= 3;
+
+    // Store whether the card is in reversed mode
+    // This is used by _buildBackContent to modify its behavior
+    final bool isReversedMode = shouldShowReversed && !(isCardFlipped);
+
     return GestureDetector(
       onTap: () => _toggleCard(flashcard.id),
       child: TweenAnimationBuilder(
-        tween: Tween<double>(
-          begin: 0,
-          end: flippedCards[flashcard.id] ?? false ? 180 : 0,
-        ),
+        tween: Tween<double>(begin: 0, end: isCardFlipped ? 180 : 0),
         duration: const Duration(milliseconds: 300),
         builder: (context, double value, child) {
           return Transform(
@@ -93,8 +124,8 @@ class _FlashcardViewState extends State<FlashcardView> {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Container(
-                width: double.infinity, // Fill width
-                height: double.infinity, // Fill height
+                width: double.infinity,
+                height: double.infinity,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
@@ -132,9 +163,25 @@ class _FlashcardViewState extends State<FlashcardView> {
                       transform:
                           Matrix4.identity()..rotateY(value >= 90 ? pi : 0),
                       child:
-                          value >= 90
-                              ? _buildBackContent(flashcard)
-                              : _buildFrontContent(flashcard),
+                          shouldShowReversed
+                              ? (value >= 90
+                                  ? _buildFrontContent(
+                                    flashcard,
+                                    isReversedMode,
+                                  ) // If flipped, show front
+                                  : _buildBackContent(
+                                    flashcard,
+                                    isReversedMode,
+                                  )) // Initially show back
+                              : (value >= 90
+                                  ? _buildBackContent(
+                                    flashcard,
+                                    isReversedMode,
+                                  ) // Normal: If flipped, show back
+                                  : _buildFrontContent(
+                                    flashcard,
+                                    isReversedMode,
+                                  )), // Normal: Initially show front
                     ),
                   ],
                 ),
@@ -146,84 +193,51 @@ class _FlashcardViewState extends State<FlashcardView> {
     );
   }
 
-  Widget _buildFrontContent(FlashcardItem flashcard) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            flashcard.question,
-            style: const TextStyle(
-              fontSize: 28,
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.5,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBackContent(FlashcardItem flashcard) {
+  Widget _buildBackContent(Flashcard flashcard, bool isReversedMode) {
     if (widget.imageUrl != null) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          // mainAxisSize: MainAxisSize.min,
           children: [
             Padding(
               padding: const EdgeInsets.all(8.0),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(
-                  maxHeight: 100, // Limit the maximum height
-                  maxWidth: 100, // Limit the maximum width
+                  maxHeight: 100,
+                  maxWidth: 100,
                 ),
                 child: CachedNetworkImage(
                   imageUrl: widget.imageUrl!,
                   fit: BoxFit.contain,
                   placeholder:
                       (context, url) => Center(
-                        child: CircularProgressIndicator(
-                          strokeWidth:
-                              2, // Make the loading indicator more subtle
-                        ),
+                        child: CircularProgressIndicator(strokeWidth: 2),
                       ),
                   errorWidget:
-                      (context, url, error) =>
-                          Center(child: const Icon(Icons.error, color: Colors.white)),
+                      (context, url, error) => const Center(
+                        child: Icon(Icons.error, color: Colors.white),
+                      ),
                 ),
               ),
             ),
-            _buildTranslationAndRatingButtons(flashcard),
-          ],
-        ),
-      );
-    }
 
-    // Center everything if no image
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (!(translationVisible[flashcard.id] ?? false))
+            // Translation visibility control
+            if (!isTranslationVisible)
               IconButton(
-                onPressed:
-                    () =>
-                        setState(() => translationVisible[flashcard.id] = true),
+                onPressed: _toggleTranslation,
                 icon: const Icon(
                   Icons.visibility,
                   color: Colors.white,
                   size: 28,
                 ),
+                tooltip: 'Show translation',
               ),
-            if (translationVisible[flashcard.id] ?? false)
+
+            // Show translation based on visibility state
+            if (isTranslationVisible)
               Text(
-                flashcard.answer,
+                flashcard.translation,
                 style: const TextStyle(
                   fontSize: 24,
                   color: Colors.white,
@@ -231,88 +245,169 @@ class _FlashcardViewState extends State<FlashcardView> {
                 ),
                 textAlign: TextAlign.center,
               ),
+
             const SizedBox(height: 32),
+
+            // Always show rating buttons on back side
             Wrap(
-              spacing: 8,
+              spacing: 12,
               runSpacing: 8,
               alignment: WrapAlignment.center,
               children: [
-                _buildRatingButton('Again', Colors.red, flashcard),
-                _buildRatingButton('Hard', Colors.orange, flashcard),
-                _buildRatingButton('Good', Colors.green, flashcard),
-                _buildRatingButton('Easy', Colors.blue, flashcard),
+                _buildRatingButton('Missed', Colors.red.shade400, flashcard),
+                _buildRatingButton(
+                  'Got It',
+                  Colors.blue.shade400,
+                  flashcard,
+                  direction: CardSwiperDirection.right,
+                ),
+                _buildRatingButton(
+                  'Lucky Guess',
+                  Colors.green.shade400,
+                  flashcard,
+                  direction: CardSwiperDirection.right,
+                  isLonger: true,
+                ),
               ],
             ),
           ],
         ),
+      );
+    }
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Translation visibility control for normal mode
+            if (!isTranslationVisible)
+              IconButton(
+                onPressed: _toggleTranslation,
+                icon: const Icon(
+                  Icons.visibility,
+                  color: Colors.white,
+                  size: 28,
+                ),
+                tooltip: 'Show translation',
+              ),
+
+            if (isTranslationVisible)
+              Text(
+                flashcard.translation,
+                style: const TextStyle(
+                  fontSize: 24,
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+
+            const SizedBox(height: 32),
+
+            // Always show rating buttons on back side
+            if (!isReversedMode) ...{
+              Wrap(
+                spacing: 12,
+                runSpacing: 8,
+                alignment: WrapAlignment.center,
+                children: [
+                  _buildRatingButton('Missed', Colors.red.shade400, flashcard),
+                  _buildRatingButton(
+                    'Got It',
+                    Colors.blue.shade400,
+                    flashcard,
+                    direction: CardSwiperDirection.right,
+                  ),
+                  _buildRatingButton(
+                    'Lucky Guess',
+                    Colors.green.shade400,
+                    flashcard,
+                    direction: CardSwiperDirection.right,
+                    isLonger: true,
+                  ),
+                ],
+              ),
+            },
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildTranslationAndRatingButtons(FlashcardItem flashcard) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (!(translationVisible[flashcard.id] ?? false))
-          IconButton(
-            onPressed:
-                () => setState(() => translationVisible[flashcard.id] = true),
-            icon: const Icon(Icons.visibility, color: Colors.white, size: 28),
-          ),
-        if (translationVisible[flashcard.id] ?? false)
+  Widget _buildFrontContent(Flashcard flashcard, bool isReversedMode) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
           Text(
-            flashcard.answer,
+            flashcard.word,
             style: const TextStyle(
-              fontSize: 24,
-              color: Colors.white,
+              fontSize: 32,
               fontWeight: FontWeight.bold,
+              color: Colors.white,
+              letterSpacing: 0.5,
             ),
             textAlign: TextAlign.center,
           ),
-        const SizedBox(height: 32),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          alignment: WrapAlignment.center,
-          children: [
-            _buildRatingButton('Again', Colors.red, flashcard),
-            _buildRatingButton('Hard', Colors.orange, flashcard),
-            _buildRatingButton('Good', Colors.green, flashcard),
-            _buildRatingButton('Easy', Colors.blue, flashcard),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAnswerButton(
-    String label,
-    Color color,
-    FlashcardItem flashcard,
-  ) {
-    return ElevatedButton(
-      onPressed: () {
-        setState(() => hasCheckedAnswer[flashcard.id] = true);
-      },
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color.withOpacity(0.8),
-        minimumSize: const Size(80, 36),
+          if (isReversedMode) ...{
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              alignment: WrapAlignment.center,
+              children: [
+                _buildRatingButton('Missed', Colors.red.shade400, flashcard),
+                _buildRatingButton(
+                  'Got It',
+                  Colors.blue.shade400,
+                  flashcard,
+                  direction: CardSwiperDirection.right,
+                ),
+                _buildRatingButton(
+                  'Lucky Guess',
+                  Colors.green.shade400,
+                  flashcard,
+                  direction: CardSwiperDirection.right,
+                  isLonger: true,
+                ),
+              ],
+            ),
+          },
+        ],
       ),
-      child: Text(label, style: const TextStyle(color: Colors.white)),
     );
   }
 
   Widget _buildRatingButton(
     String label,
     Color color,
-    FlashcardItem flashcard,
-  ) {
+    Flashcard flashcard, {
+    CardSwiperDirection direction = CardSwiperDirection.left,
+    bool isLonger = false,
+  }) {
     return SizedBox(
-      width: 80,
+      width: isLonger ? 100 : 90,
       child: ElevatedButton(
         onPressed: () {
-          widget.onRatingSelected(label.toLowerCase(), flashcard);
-          controller.swipe(CardSwiperDirection.left);
+          // First trigger the swipe animation - do this before modifying the list
+          widget.controller.swipe(direction);
+
+          print('Flashcard word: ${flashcard.word} N: ${DateTime.fromMillisecondsSinceEpoch(flashcard.srsNextReviewDate).toIso8601String()} I: ${flashcard.srsInterval} E: ${flashcard.srsEaseFactor} P: ${flashcard.srsIsPriority} L: ${flashcard.srsIsInLearningPhase} B: ${flashcard.srsBaseIntervalIndex} Q: ${flashcard.srsQuickStreak}');
+          // Small delay to allow animation to start before modifying the list
+          Future.delayed(const Duration(milliseconds: 100), () {
+            // Then notify parent about the rating (which will update SRS and modify the list)
+            widget.onRatingSelected(label, flashcard);
+          });
+
+          print('@: Flashcard word: ${flashcard.word} N: ${DateTime.fromMillisecondsSinceEpoch(flashcard.srsNextReviewDate).toIso8601String()} I: ${flashcard.srsInterval} E: ${flashcard.srsEaseFactor} P: ${flashcard.srsIsPriority} L: ${flashcard.srsIsInLearningPhase} B: ${flashcard.srsBaseIntervalIndex} Q: ${flashcard.srsQuickStreak}');
+
+          // Reset card state
+          setState(() {
+            isCardFlipped = false;
+            isTranslationVisible = false;
+            hasCheckedAnswer = false;
+          });
         },
         style: ElevatedButton.styleFrom(
           backgroundColor: color.withOpacity(0.8),
@@ -321,5 +416,21 @@ class _FlashcardViewState extends State<FlashcardView> {
         child: Text(label, style: const TextStyle(color: Colors.white)),
       ),
     );
+  }
+
+  void _toggleTranslation() {
+    setState(() {
+      isTranslationVisible = !isTranslationVisible;
+    });
+  }
+
+  void _toggleCard(String cardId) {
+    setState(() {
+      isCardFlipped = !isCardFlipped;
+      if (!isCardFlipped) {
+        isTranslationVisible = false;
+        hasCheckedAnswer = false;
+      }
+    });
   }
 }

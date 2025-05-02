@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:lingua_visual/models/flashcard_converters.dart';
 import 'package:lingua_visual/providers/offline_flashcard_provider.dart';
 import '../widgets/flashcard_view.dart';
 
@@ -20,7 +19,8 @@ class OfflineTrainingScreen extends HookConsumerWidget {
       );
     }
 
-    final currentCard = flashcards.value![currentIndex];
+    // Get current card, handling index bounds
+    final currentOfflineCard = currentIndex < flashcards.value!.length ? flashcards.value![currentIndex] : null;
 
     Future<void> onRatingSelected(String rating) async {
       // Update SRS data based on rating
@@ -81,7 +81,7 @@ class OfflineTrainingScreen extends HookConsumerWidget {
         padding: const EdgeInsets.all(16.0),
         child: SafeArea(
           child: FlashcardView(
-            flashcards: [FlashcardConverters.offlineToFlashcardItem(currentCard)],  // Wrap in list
+            flashcards: currentOfflineCard != null ? [currentOfflineCard] : [], 
             onRatingSelected: (rating, _) => onRatingSelected(rating),
           ),
         ),

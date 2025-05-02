@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:lingua_visual/models/language.dart';
 import 'package:lingua_visual/providers/auth_provider.dart' as auth_prov;
+import 'package:lingua_visual/providers/flashcard_provider.dart';
 import 'package:lingua_visual/providers/settings_provider.dart';
+import 'package:lingua_visual/providers/offline_flashcard_provider.dart';
+import 'package:lingua_visual/providers/stack_provider.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -178,23 +181,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           ListTile(
             leading: const Icon(Icons.storage),
-            title: const Text('Clear Cache'),
+            title: const Text('Clear Offline Data'),
             subtitle: const Text('Free up space'),
             onTap: () {
               showDialog(
                 context: context,
                 builder: (context) => AlertDialog(
-                  title: const Text('Clear Cache'),
-                  content: const Text('This will clear all cached images. Continue?'),
+                  title: const Text('Clear Offline Data'),
+                  content: const Text('This will remove all locally stored flashcards and stacks. Continue?'),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(context),
                       child: const Text('CANCEL'),
                     ),
                     TextButton(
-                      onPressed: () {
-                        // TODO: Implement cache clearing
-                        Navigator.pop(context);
+                      onPressed: () async {
+                        // await ref.read(offlineFlashcardsProvider.notifier).clearOfflineData();
+                        await ref.read(flashcardStateProvider.notifier).clearOfflineFlashcardData();
+                        await ref.read(stacksProvider.notifier).clearOfflineStackData();
+                        Navigator.pop(context); // Close dialog
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Offline data cleared successfully.'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        }
                       },
                       child: const Text('CLEAR'),
                     ),

@@ -4,5 +4,5 @@ import 'firebase_provider.dart';
 
 final authServiceProvider = Provider<AuthService>((ref) {
   final firebaseService = ref.watch(firebaseServiceProvider);
-  return AuthService(firebaseService);
+  return AuthService(firebaseService, ref);
 });

@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../providers/firebase_provider.dart'; 
-import '../../services/auth_service.dart';
-
-final authServiceProvider = Provider((ref) => AuthService(ref.watch(firebaseServiceProvider)));
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../providers/auth_provider.dart';
 
 class SignUpScreen extends ConsumerStatefulWidget {
   const SignUpScreen({super.key});
@@ -46,11 +44,20 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         );
         Navigator.of(context).pop(); // Return to login screen
       }
-    } catch (e) {
+    } on FirebaseAuthException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(e.toString()),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('An error occurred'),
             backgroundColor: Colors.red,
           ),
         );

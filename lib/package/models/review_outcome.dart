@@ -1,22 +1,26 @@
-/// Represents the possible outcomes of a flashcard review in the AdaptiveFlow SRS system.
+/// Represents the possible outcomes of a flashcard review based on confidence levels.
 ///
-/// These outcomes correspond to the simplified three-button feedback system
-/// and are used to determine how the card's interval and personal difficulty factor
+/// These outcomes correspond to a three-button feedback system (Hard, Good, Easy)
+/// and are used to determine how the card's interval and ease factor
 /// should be adjusted.
 enum ReviewOutcome {
-  /// The user failed to recall the card and needs to review it again soon.
-  /// This will decrease the interval and increase the personal difficulty factor.
-  missed,
+  /// The user recalled the card correctly but with significant effort (Hard).
+  /// This will slightly decrease the interval and ease factor,
+  /// and schedule the card to be reviewed again later today.
+  /// In the UI, this corresponds to the "Missed" button.
+  hard,
 
-  /// The user recalled the card correctly but with some effort.
-  /// This will increase the interval according to the algorithm while
-  /// keeping the personal difficulty factor unchanged.
-  gotIt,
+  /// The user recalled the card correctly with moderate effort (Good).
+  /// This will increase the interval according to the algorithm
+  /// and slightly increase the ease factor.
+  /// In the UI, this corresponds to the "Lucky Guess" button.
+  good,
 
-  /// The user recalled the card easily and quickly with minimal effort.
-  /// This will increase the interval more than 'gotIt' and
-  /// decrease the personal difficulty factor.
-  quick,
+  /// The user recalled the card very easily with minimal effort (Easy).
+  /// This will increase the interval more than 'good' and
+  /// increase the ease factor more significantly.
+  /// In the UI, this corresponds to the "Got It" button.
+  easy,
 }
 
 /// Represents the type of review exercise used for a flashcard.

@@ -161,6 +161,16 @@
   "imagePromptNoConnection": "Brak połączenia z internetem",
   "imagePromptCheckConnection": "Sprawdź połączenie i spróbuj ponownie",
   "imagePromptClose": "ZAMKNIJ",
+  "addImageToFlashcard": "Dodaj obraz do fiszki",
+  "generateMeaningfulImage": "Pomóż nam wygenerować odpowiedni obraz dla Twojej fiszki!",
+  "describeWordVisualization": "Opisz, co to słowo oznacza dla Ciebie lub jak je sobie wyobrażasz.",
+  "enterPromptHint": "Wprowadź opis obrazu",
+  "noImageGeneratedYet": "Nie wygenerowano jeszcze obrazu",
+  "hideUnsplashImages": "Ukryj obrazy Unsplash",
+  "browseUnsplashImages": "Przeglądaj obrazy Unsplash",
+  "fromDevice": "Z URZĄDZENIA",
+  "generateImage": "GENERUJ OBRAZ",
+  "useThisOne": "UŻYJ TEGO",
   "sortLatest": "Najnowsze",
   "sortOldest": "Najstarsze"
 }

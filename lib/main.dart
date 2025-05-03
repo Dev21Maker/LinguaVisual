@@ -302,7 +302,7 @@ class HomeScreen extends ConsumerWidget {
       top: false,
       child: Scaffold(
         body: DefaultTabController(
-          length: 4,
+          length: 3,
           initialIndex: currentIndex,
           child: HookBuilder(
             builder: (context) {
@@ -325,13 +325,18 @@ class HomeScreen extends ConsumerWidget {
                     tabs: const [
                       Tab(icon: Icon(Icons.school), text: 'Learn'),
                       Tab(icon: Icon(Icons.library_books), text: 'Flashcards'),
-                      Tab(icon: Icon(Icons.bar_chart), text: 'Progress'),
+                      // TODO (keep this tab for now) - Tab(icon: Icon(Icons.bar_chart), text: 'Progress'),
                       Tab(icon: Icon(Icons.settings), text: 'Settings'),
                     ],
                   ),
                   body: TabBarView(
                     controller: tabController,
-                    children: const [GamesView(), FlashcardScreen(), ProgressScreen(), SettingsScreen()],
+                    children: const [
+                      GamesView(), 
+                      FlashcardScreen(), 
+                      // TODO (keep this tab for now) - ProgressScreen(), 
+                      SettingsScreen()
+                    ],
                   ),
                 ),
               );

@@ -208,5 +208,15 @@
   "flashcardActionReveal": "Reveal Answer",
   "imagePromptNoConnection": "No Internet Connection",
   "imagePromptCheckConnection": "Please check your connection and try again",
-  "imagePromptClose": "CLOSE"
+  "imagePromptClose": "CLOSE",
+  "addImageToFlashcard": "Add Image to Flashcard",
+  "generateMeaningfulImage": "Help us generate a meaningful image for your flashcard!",
+  "describeWordVisualization": "Describe what this word means to you or how you visualize it.",
+  "enterPromptHint": "Enter image description",
+  "noImageGeneratedYet": "No image generated yet",
+  "hideUnsplashImages": "Hide Unsplash Images",
+  "browseUnsplashImages": "Browse Unsplash Images",
+  "fromDevice": "FROM DEVICE",
+  "generateImage": "GENERATE IMAGE",
+  "useThisOne": "USE THIS ONE"
 }

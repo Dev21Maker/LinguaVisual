@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:unsplash_client/unsplash_client.dart';
 import '../services/api_service.dart';
-import '../widgets/image_picker_web_view.dart';
+import '../providers/unsplash_provider.dart';
 
 class ImagePromptDialog extends StatefulWidget {
   final String word;
@@ -22,12 +24,18 @@ class _ImagePromptDialogState extends State<ImagePromptDialog> {
   final _promptController = TextEditingController();
   final _imageApiService = ImageApiService();
   bool _isLoading = false;
+  bool _isPickingUnsplash = false;
 
   @override
   void initState() {
     super.initState();
-    // Initialize with empty text instead of the word
     _promptController.text = '';
+  }
+
+  @override
+  void dispose() {
+    _promptController.dispose();
+    super.dispose();
   }
 
   Future<void> _generateImage() async {
@@ -44,37 +52,50 @@ class _ImagePromptDialogState extends State<ImagePromptDialog> {
   }
 
   Future<void> _pickFromDevice() async {
+    if (!mounted) return;
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('Device image picking is not available yet')));
   }
 
-  Future<void> _pickFromGoogle() async {
-    final imageUrl = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(
-        builder:
-            (context) => Scaffold(
-              appBar: AppBar(title: const Text('Pick from Google')),
-              body: ImagePickerWebView(
-                initialUrl: buildGoogleImagesSearchUrl(widget.word),
-                onImageSelected: (url) {
-                  Navigator.pop(context, url);
-                },
-              ),
-            ),
-      ),
-    );
+  Future<void> _pickFromUnsplash() async {
+    final unsplashClientAsyncValue = ProviderScope.containerOf(context).read(unsplashClientProvider);
 
-    if (imageUrl != null) {
-      widget.onImageSelected(imageUrl);
-      if (mounted) Navigator.of(context).pop();
+    if (!mounted) return;
+    setState(() => _isPickingUnsplash = true);
+
+    try {
+      final query = _promptController.text.trim().isNotEmpty ? _promptController.text.trim() : widget.word;
+
+      final photos = await unsplashClientAsyncValue.search.photos(query, page: 1, perPage: 10).goAndGet();
+
+      if (photos.results.isNotEmpty) {
+        final photo = photos.results.first;
+        final imageUrl = photo.urls.small.toString();
+        widget.onImageSelected(imageUrl);
+        if (mounted) Navigator.of(context).pop();
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('No images found on Unsplash for "$query"')));
+        }
+      }
+    } on Exception catch (e) {
+      print('Unsplash API Error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error fetching from Unsplash: $e.')));
+      }
+    } catch (e) {
+      print('Error picking from Unsplash: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('An unexpected error occurred.')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isPickingUnsplash = false);
+      }
     }
-  }
-
-  String buildGoogleImagesSearchUrl(String query) {
-    final encodedQuery = Uri.encodeComponent(query);
-    return 'https://www.google.com/search?tbm=isch&q=$encodedQuery';
   }
 
   @override
@@ -110,7 +131,13 @@ class _ImagePromptDialogState extends State<ImagePromptDialog> {
       ),
       actions: [
         TextButton(onPressed: _pickFromDevice, child: const Text('FROM DEVICE')),
-        TextButton(onPressed: _pickFromGoogle, child: const Text('FROM GOOGLE')),
+        TextButton(
+          onPressed: _isPickingUnsplash ? null : _pickFromUnsplash,
+          child:
+              _isPickingUnsplash
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Text('FROM UNSPLASH'),
+        ),
         ElevatedButton(
           onPressed: _isLoading ? null : _generateImage,
           child:

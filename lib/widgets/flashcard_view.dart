@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:lingua_visual/models/flashcard.dart';
 
 class FlashcardView extends StatefulWidget {
@@ -89,6 +90,66 @@ class _FlashcardBuildItemViewState extends State<FlashcardBuildItemView> {
   bool isCardFlipped = false;
   bool isTranslationVisible = false; // Keep this state variable
   bool hasCheckedAnswer = false;
+  
+  // TTS instance
+  late FlutterTts flutterTts;
+  bool _ttsInitialized = false;
+  
+  @override
+  void initState() {
+    super.initState();
+    // Initialize TTS
+    flutterTts = FlutterTts();
+    _initTts();
+  }
+  
+  Future<void> _initTts() async {
+    try {
+      // Set language based on the flashcard's target language
+      await flutterTts.setLanguage(flashcard.targetLanguageCode);
+      // Set other TTS options if needed
+      await flutterTts.setSpeechRate(0.5); // Slower rate for language learning
+      _ttsInitialized = true;
+    } catch (e) {
+      print('TTS initialization error: $e');
+      _ttsInitialized = false;
+    }
+  }
+  
+  @override
+  void dispose() {
+    try {
+      flutterTts.stop();
+    } catch (e) {
+      print('TTS disposal error: $e');
+    }
+    super.dispose();
+  }
+  
+  // Method to speak text
+  Future<void> _speak(String text) async {
+    if (!_ttsInitialized) {
+      print('TTS not initialized - attempting to reinitialize');
+      await _initTts();
+      if (!_ttsInitialized) {
+        print('TTS still not initialized, aborting speak');
+        return;
+      }
+    }
+    
+    try {
+      await flutterTts.speak(text);
+    } catch (e) {
+      print('TTS speak error: $e');
+      // Show a snackbar or other UI feedback about TTS failure
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to play audio. Please restart the app.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
 
   void _showImageDialog(BuildContext context, String imageUrl) {
     showDialog(
@@ -255,6 +316,9 @@ class _FlashcardBuildItemViewState extends State<FlashcardBuildItemView> {
   }
 
   Widget _buildBackContent(Flashcard flashcard, bool isReversedMode) {
+    // Get the text to display based on the mode
+    final String textToSpeak = isReversedMode ? flashcard.word : flashcard.translation;
+    
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(20.0), 
@@ -331,17 +395,28 @@ class _FlashcardBuildItemViewState extends State<FlashcardBuildItemView> {
 
             // Translation Text (conditionally visible)
             if (isTranslationVisible)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8.0), // Add padding around text
-                child: Text(
-                  isReversedMode ? flashcard.word : flashcard.translation,
-                  style: const TextStyle(
-                    fontSize: 24,
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
+              Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0), // Add padding around text
+                    child: Text(
+                      isReversedMode ? flashcard.word : flashcard.translation,
+                      style: const TextStyle(
+                        fontSize: 24,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
                   ),
-                  textAlign: TextAlign.center,
-                ),
+                  // Add TTS button when text is visible
+                  IconButton(
+                    icon: const Icon(Icons.volume_up, color: Colors.white, size: 28),
+                    onPressed: () => _speak(textToSpeak),
+                    tooltip: 'Listen to pronunciation',
+                    padding: const EdgeInsets.all(8),
+                  ),
+                ],
               )
             else // Show the button only when text is hidden
               IconButton(
@@ -404,6 +479,9 @@ class _FlashcardBuildItemViewState extends State<FlashcardBuildItemView> {
   }
 
   Widget _buildFrontContent(Flashcard flashcard, bool isReversedMode) {
+    // Text to speak for the front card
+    final String textToSpeak = flashcard.word;
+    
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -417,6 +495,13 @@ class _FlashcardBuildItemViewState extends State<FlashcardBuildItemView> {
               letterSpacing: 0.5,
             ),
             textAlign: TextAlign.center,
+          ),
+          // Add TTS button for the front text
+          IconButton(
+            icon: const Icon(Icons.volume_up, color: Colors.white, size: 28),
+            onPressed: () => _speak(textToSpeak),
+            tooltip: 'Listen to pronunciation',
+            padding: const EdgeInsets.all(8),
           ),
           if (isReversedMode) ...{
             Row(

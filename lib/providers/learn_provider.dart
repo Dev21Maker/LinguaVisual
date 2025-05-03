@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:lingua_visual/models/flashcard.dart';
@@ -51,6 +52,9 @@ final isSessionCompleteProvider = StateProvider<bool>((ref) => false);
 
 /// Provider for the selected stack ID
 final selectedStackIdProvider = StateProvider<String?>((ref) => null);
+
+/// Provider for whether reverse mode is active
+final isReverseModeProvider = StateProvider<bool>((ref) => false);
 
 /// LearnProvider class to handle the display logic for flashcards
 class LearnProvider extends StateNotifier<AsyncValue<void>> {
@@ -143,13 +147,46 @@ class LearnProvider extends StateNotifier<AsyncValue<void>> {
       ref.read(isSessionCompleteProvider.notifier).state = true;
       setCurrentFlashcard(null);
     } else {
-      // Load the next flashcard
+      // Load the next flashcard and decide if reverse mode should be activated
       _loadCurrentFlashcard(updatedDueItems.first.id);
+      _considerActivatingReverseMode(updatedDueItems.first);
+    }
+  }
+
+  /// Decides whether to activate reverse mode based on the SRS item's interval
+  void _considerActivatingReverseMode(SrsItem item) {
+    // Only consider reverse mode for cards with high intervals
+    // Define high interval as 7 days (604800000 milliseconds) or more
+    const highIntervalThreshold = 604800000.0; // 7 days in milliseconds
+    
+    if (item.lastInterval >= highIntervalThreshold) {
+      // 25% chance to activate reverse mode for eligible cards
+      final random = Random();
+      final shouldActivate = random.nextDouble() < 0.25; // 25% chance
+      
+      ref.read(isReverseModeProvider.notifier).state = shouldActivate;
+    } else {
+      // Ensure reverse mode is turned off for cards with lower intervals
+      ref.read(isReverseModeProvider.notifier).state = false;
     }
   }
 
   /// Returns the content to display on the front of the card
   Widget buildFrontContent(Flashcard flashcard, {required Function onSpeakPressed}) {
+    final isReverseMode = ref.read(isReverseModeProvider);
+    
+    // In reverse mode, show the back content as front
+    if (isReverseMode) {
+      return buildBackContent(
+        flashcard,
+        onSpeakPressed: onSpeakPressed,
+        onImagePressed: () {}, // Simplified for reverse mode
+        isTranslationVisible: true, // Always show translation in reverse mode
+        onToggleTranslation: () {}, // Disable toggle in reverse mode
+      );
+    }
+    
+    // Normal mode - show regular front content
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -159,16 +196,14 @@ class LearnProvider extends StateNotifier<AsyncValue<void>> {
             fontSize: 32,
             fontWeight: FontWeight.bold,
             color: Colors.white,
-            letterSpacing: 0.5,
           ),
           textAlign: TextAlign.center,
         ),
-        // Add TTS button for the front text
+        const SizedBox(height: 16),
         IconButton(
-          icon: const Icon(Icons.volume_up, color: Colors.white, size: 28),
+          icon: const Icon(Icons.volume_up, color: Colors.white, size: 32),
           onPressed: () => onSpeakPressed(),
           tooltip: 'Listen to pronunciation',
-          padding: const EdgeInsets.all(8),
         ),
       ],
     );
@@ -182,30 +217,38 @@ class LearnProvider extends StateNotifier<AsyncValue<void>> {
     required bool isTranslationVisible,
     required Function onToggleTranslation,
   }) {
+    final isReverseMode = ref.read(isReverseModeProvider);
+    
+    // In reverse mode, show the front content as back (and include review buttons)
+    if (isReverseMode) {
+      return Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            flashcard.word,
+            style: const TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          IconButton(
+            icon: const Icon(Icons.volume_up, color: Colors.white, size: 32),
+            onPressed: () => onSpeakPressed(),
+            tooltip: 'Listen to pronunciation',
+          ),
+        ],
+      );
+    }
+    
+    // Normal mode - show regular back content
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // Word display
-        Text(
-          flashcard.word,
-          style: const TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        
-        // Sound button
-        IconButton(
-          icon: const Icon(Icons.volume_up, color: Colors.white, size: 24),
-          onPressed: () => onSpeakPressed(),
-          tooltip: 'Listen to pronunciation',
-          padding: const EdgeInsets.all(4),
-        ),
-        
-        // Image (if available)
-        if (flashcard.imageUrl?.isNotEmpty ?? false)
+        // Images (if available)
+        if (flashcard.imageUrl != null)
           GestureDetector(
             onTap: () => onImagePressed(),
             child: Container(

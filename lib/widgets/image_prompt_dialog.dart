@@ -1,24 +1,23 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:unsplash_client/unsplash_client.dart';
 import '../services/api_service.dart';
 import '../providers/unsplash_provider.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
-import 'package:insta_image_viewer/insta_image_viewer.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class ImagePromptDialog extends ConsumerStatefulWidget {
   final String word;
   final Function(String) onImageSelected;
   final bool barrierDismissible;
+  final bool hasConnection;
 
   const ImagePromptDialog({
     super.key,
     required this.word,
     required this.onImageSelected,
     this.barrierDismissible = false,
+    this.hasConnection = true,
   });
 
   @override
@@ -144,7 +143,11 @@ class _ImagePromptDialogState extends ConsumerState<ImagePromptDialog> {
           child: const Text('USE SELECTED'),
         ),
         ElevatedButton(
-          onPressed: _isLoading ? null : _generateImage,
+          onPressed: (!widget.hasConnection || _isLoading) ? null : _generateImage,
+          style: ElevatedButton.styleFrom(
+            disabledBackgroundColor: Colors.grey,
+            disabledForegroundColor: Colors.white70,
+          ),
           child:
               _isLoading
                   ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))

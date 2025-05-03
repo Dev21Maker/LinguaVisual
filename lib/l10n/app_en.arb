@@ -5,6 +5,7 @@
   "commonCreate": "CREATE",
   "commonError": "Error",
   "commonRetry": "Retry",
+  "dialogDeleteTitle": "Delete",
   "flashcardsAddSomeFlashcards": "Add some flashcards to get started",
   "flashcardsAllFlashcardsDropdown": "All Flashcards",
   "flashcardsAppBarTitle": "Flashcards",
@@ -105,6 +106,8 @@
   "settingsAboutSectionTitle": "About",
   "settingsAccountSectionTitle": "Account",
   "settingsAppSettingsSectionTitle": "App Settings",
+  "settingsAppVersion": "App Version",
+  "settingsBuildNumber": "Build Number",
   "settingsChangeAppLanguageSubtitle": "Switch the language the app is displayed in",
   "settingsChangeAppLanguageTitle": "Change App Language",
   "settingsClearDataButtonPositive": "YES",
@@ -142,6 +145,9 @@
       }
     }
   },
+  "settingsSortLatest": "Latest",
+  "settingsSortOldest": "Oldest",
+  "settingsSortRefresh": "Refresh",
   "settingsTargetLanguageTile": "Target Language - Default",
   "settingsVersionTile": "Version",
   "settingsVersionValue": "1.0.0",
@@ -160,6 +166,9 @@
   "signUpPasswordsDoNotMatchValidation": "Passwords do not match",
   "signUpSuccessMessage": "Account created! Please check your email to verify.",
   "signUpUnexpectedError": "An error occurred",
+  "sortLatest": "Latest",
+  "sortOldest": "Oldest",
+  "actionRefresh": "Refresh",
   "stackDetailAddCardTooltip": "Add flashcard to stack",
   "stackDetailEmptySubtitle": "Add flashcards to start practicing",
   "stackDetailEmptyTitle": "No flashcards in this stack",
@@ -194,7 +203,10 @@
   "stackListEmptyButton": "Create Stack",
   "stackListEmptySubtitle": "Create a stack to organize your flashcards",
   "stackListEmptyTitle": "No stacks yet",
-  "stackListErrorLoading": "Error loading stacks"
+  "stackListErrorLoading": "Error loading stacks",
+  "flashcardActionCheck": "Check",
+  "flashcardActionReveal": "Reveal Answer",
+  "imagePromptNoConnection": "No Internet Connection",
+  "imagePromptCheckConnection": "Please check your connection and try again",
+  "imagePromptClose": "CLOSE"
 }
-
-

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lingua_visual/models/flashcard.dart';
+import 'package:lingua_visual/providers/connectivity_provider.dart';
 import 'package:lingua_visual/widgets/image_prompt_dialog.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
-class FlashcardTile<T extends Flashcard> extends StatefulWidget {
+class FlashcardTile<T extends Flashcard> extends ConsumerStatefulWidget {
   const FlashcardTile({
     required this.card,
     required this.translationVisible,
@@ -22,10 +24,10 @@ class FlashcardTile<T extends Flashcard> extends StatefulWidget {
   final Function(String, String) onImageUpdated;
 
   @override
-  State<FlashcardTile> createState() => _FlashcardTileState();
+  ConsumerState<FlashcardTile<T>> createState() => _FlashcardTileState<T>();
 }
 
-class _FlashcardTileState extends State<FlashcardTile> {
+class _FlashcardTileState<T extends Flashcard> extends ConsumerState<FlashcardTile<T>> {
   Future<void> _showImagePickerDialog() async {
     final imageUrl = await showDialog<String>(
       context: context,
@@ -37,6 +39,7 @@ class _FlashcardTileState extends State<FlashcardTile> {
               Navigator.pop(context, url);
             },
             barrierDismissible: true,
+            hasConnection: ref.read(isOnlineProvider.notifier).state,
           ),
     );
 

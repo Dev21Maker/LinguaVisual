@@ -227,7 +227,7 @@ class FlashcardScreen extends HookConsumerWidget {
                             color: Theme.of(context).iconTheme.color,
                           ),
                           const SizedBox(width: 8),
-                          Text(isReversed.value ? l10n.commonCancel : l10n.commonCreate),
+                          Text(isReversed.value ? l10n.sortOldest : l10n.sortLatest),
                         ],
                       ),
                     ),
@@ -237,7 +237,7 @@ class FlashcardScreen extends HookConsumerWidget {
                         children: [
                           Icon(Icons.refresh, size: 20, color: Theme.of(context).iconTheme.color),
                           const SizedBox(width: 8),
-                          Text(l10n.commonRetry),
+                          Text(l10n.actionRefresh),
                         ],
                       ),
                     ),
@@ -305,7 +305,7 @@ class FlashcardScreen extends HookConsumerWidget {
                             context: context,
                             builder:
                                 (context) => AlertDialog(
-                                  title: Text(l10n.commonCancel),
+                                  title: Text(l10n.dialogDeleteTitle),
                                   content: Text('Are you sure you want to delete ${stack.name}?'),
                                   actions: [
                                     TextButton(

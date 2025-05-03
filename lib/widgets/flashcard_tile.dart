@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lingua_visual/models/flashcard.dart';
 import 'package:lingua_visual/widgets/image_prompt_dialog.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class FlashcardTile<T extends Flashcard> extends StatefulWidget {
   const FlashcardTile({
@@ -9,7 +10,7 @@ class FlashcardTile<T extends Flashcard> extends StatefulWidget {
     required this.changeTranslationVisibility,
     required this.showMoveToStackDialog,
     required this.getEmoji,
-    required this.onImageUpdated, // Add this new parameter
+    required this.onImageUpdated,
     super.key,
   });
 
@@ -18,7 +19,7 @@ class FlashcardTile<T extends Flashcard> extends StatefulWidget {
   final Function(String) changeTranslationVisibility;
   final VoidCallback showMoveToStackDialog;
   final String Function() getEmoji;
-  final Function(String, String) onImageUpdated; // Add this new callback
+  final Function(String, String) onImageUpdated;
 
   @override
   State<FlashcardTile> createState() => _FlashcardTileState();
@@ -28,14 +29,14 @@ class _FlashcardTileState extends State<FlashcardTile> {
   Future<void> _showImagePickerDialog() async {
     final imageUrl = await showDialog<String>(
       context: context,
-      barrierDismissible: true, // Changed to true
+      barrierDismissible: true,
       builder:
           (context) => ImagePromptDialog(
-            word: widget.card.word,
+            word: widget.card.word.toString(),
             onImageSelected: (url) {
               Navigator.pop(context, url);
             },
-            barrierDismissible: true, // Added parameter
+            barrierDismissible: true,
           ),
     );
 
@@ -127,7 +128,29 @@ class _FlashcardTileState extends State<FlashcardTile> {
                 ],
               ),
             ),
-
+            if (widget.card.imageUrl != null && widget.card.imageUrl!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0, left: 16.0, right: 16.0, bottom: 8.0),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8.0),
+                  child: CachedNetworkImage(
+                    imageUrl: widget.card.imageUrl!,
+                    height: 150,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(
+                      height: 150,
+                      color: Colors.grey[300],
+                      child: const Center(child: CircularProgressIndicator()),
+                    ),
+                    errorWidget: (context, url, error) => Container(
+                      height: 150,
+                      color: Colors.grey[300],
+                      child: const Center(child: Icon(Icons.broken_image, color: Colors.grey)),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),

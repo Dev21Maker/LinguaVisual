@@ -1,6 +1,7 @@
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:unsplash_client/unsplash_client.dart';
+import 'package:http/http.dart' as http;
 
 // Singleton class to manage the UnsplashClient instance
 class UnsplashService {
@@ -13,7 +14,7 @@ class UnsplashService {
   // Static getter for the instance
   static UnsplashService get instance => _instance;
 
-  late UnsplashClient? _client;
+  UnsplashClient? _client;
 
   // Asynchronously initialize the client
   UnsplashClient? initialize() {
@@ -40,6 +41,7 @@ class UnsplashService {
 
       // Initialize client using AppCredentials
       _client = UnsplashClient(
+        httpClient: http.Client(),
         settings: ClientSettings(
           credentials: AppCredentials(
             accessKey: apiKey,
@@ -48,10 +50,12 @@ class UnsplashService {
           ),
         ),
       );
+      print('Client: $_client');
       return _client!;
     } catch (e) {
       print('Error initializing UnsplashService: $e'); // Re-throw the exception so the FutureProvider can handle it
     }
+    return null;
   }
 
   // Get the initialized client (throws if not initialized)
@@ -71,12 +75,12 @@ class UnsplashService {
 }
 
 // FutureProvider that uses the Singleton's initialize method
-final unsplashClientProvider = Provider<UnsplashClient>((ref) {
+final unsplashClientProvider = Provider<UnsplashClient?>((ref) {
   final client = UnsplashService.instance.initialize();
 
   ref.onDispose(() {
     UnsplashService.instance.close();
   });
 
-  return client!;
+  return client;
 });

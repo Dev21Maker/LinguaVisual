@@ -482,7 +482,6 @@ class LearnScreen extends HookConsumerWidget {
       return FlashcardView(
         key: ValueKey(dueFlashcards.isNotEmpty ? dueFlashcards[0].id : 'empty'),
         flashcards: dueFlashcards,
-        // Callback executed when the user selects a rating ('Quick', 'Good', 'Hard').
         onRatingSelected: (rating, flashcard) async {
           // Map the button label to the SRS rating format
           // The expected values for AdaptiveFlow are 'quick', 'got', 'missed'

@@ -54,7 +54,7 @@ final isSessionCompleteProvider = StateProvider<bool>((ref) => false);
 final selectedStackIdProvider = StateProvider<String?>((ref) => null);
 
 /// Provider for whether reverse mode is active
-final isReverseModeProvider = StateProvider<bool>((ref) => false);
+final isReverseModeProvider = StateProvider<bool>((ref) => true);
 
 /// LearnProvider class to handle the display logic for flashcards
 class LearnProvider extends StateNotifier<AsyncValue<void>> {

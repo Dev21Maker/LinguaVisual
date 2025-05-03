@@ -1,6 +1,5 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:lingua_visual/models/flashcard.dart';
@@ -14,7 +13,6 @@ class FlashcardView extends StatefulWidget {
     super.key,
     required this.flashcards,
     required this.onRatingSelected,
-  
     this.showTranslation = true,
   });
 
@@ -24,9 +22,6 @@ class FlashcardView extends StatefulWidget {
 
 class _FlashcardViewState extends State<FlashcardView> {
   final CardSwiperController controller = CardSwiperController();
-  final Map<String, bool> flippedCards = {};
-  bool isTranslationVisible = false;
-  final Map<String, bool> hasCheckedAnswer = {};
 
   @override
   void dispose() {
@@ -71,14 +66,14 @@ class _FlashcardViewState extends State<FlashcardView> {
 class FlashcardBuildItemView extends StatefulWidget {
   const FlashcardBuildItemView({
     required this.flashcard,
-    required this.controller,
     required this.onRatingSelected,
+    required this.controller,
     super.key,
   });
 
   final Flashcard flashcard;
-  final CardSwiperController controller;
   final Function(String, Flashcard) onRatingSelected;
+  final CardSwiperController controller;
 
   @override
   State<FlashcardBuildItemView> createState() => _FlashcardBuildItemViewState();
@@ -88,21 +83,22 @@ class _FlashcardBuildItemViewState extends State<FlashcardBuildItemView> {
   Flashcard get flashcard => widget.flashcard;
 
   bool isCardFlipped = false;
-  bool isTranslationVisible = false; // Keep this state variable
+  bool isTranslationVisible = false;
   bool hasCheckedAnswer = false;
   
   // TTS instance
   late FlutterTts flutterTts;
   bool _ttsInitialized = false;
-  
+
   @override
   void initState() {
     super.initState();
     // Initialize TTS
     flutterTts = FlutterTts();
     _initTts();
+    _speak(flashcard.word);
   }
-  
+
   Future<void> _initTts() async {
     try {
       // Set language based on the flashcard's target language
@@ -115,7 +111,7 @@ class _FlashcardBuildItemViewState extends State<FlashcardBuildItemView> {
       _ttsInitialized = false;
     }
   }
-  
+
   @override
   void dispose() {
     try {
@@ -125,7 +121,7 @@ class _FlashcardBuildItemViewState extends State<FlashcardBuildItemView> {
     }
     super.dispose();
   }
-  
+
   // Method to speak text
   Future<void> _speak(String text) async {
     if (!_ttsInitialized) {
@@ -136,7 +132,7 @@ class _FlashcardBuildItemViewState extends State<FlashcardBuildItemView> {
         return;
       }
     }
-    
+
     try {
       await flutterTts.speak(text);
     } catch (e) {
@@ -156,46 +152,47 @@ class _FlashcardBuildItemViewState extends State<FlashcardBuildItemView> {
       context: context,
       builder: (BuildContext context) {
         return Dialog(
-          backgroundColor: Colors.transparent, 
-          insetPadding: const EdgeInsets.all(10), 
-          child: GestureDetector( 
-             onTap: () => Navigator.of(context).pop(),
-             child: InteractiveViewer(
-               panEnabled: true, 
-               boundaryMargin: const EdgeInsets.all(20),
-               minScale: 0.5,
-               maxScale: 5, 
-               child: Center( 
-                  child: ClipRRect( 
-                    borderRadius: BorderRadius.circular(12.0),
-                    child: Image.network(
-                       imageUrl,
-                       fit: BoxFit.contain,
-                       loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
-                         if (loadingProgress == null) return child;
-                         return Container( 
-                           width: MediaQuery.of(context).size.width * 0.8,
-                           height: MediaQuery.of(context).size.height * 0.6,
-                           alignment: Alignment.center,
-                           child: const CircularProgressIndicator(),
-                         );
-                       },
-                       errorBuilder: (context, error, stackTrace) => Container( 
-                         width: MediaQuery.of(context).size.width * 0.8,
-                         height: MediaQuery.of(context).size.height * 0.6,
-                         color: Colors.grey[200],
-                         child: const Center(child: Icon(Icons.error_outline, color: Colors.red, size: 50)),
-                       ),
-                     ),
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(10),
+          child: GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: InteractiveViewer(
+              panEnabled: true,
+              boundaryMargin: const EdgeInsets.all(20),
+              minScale: 0.5,
+              maxScale: 5,
+              child: Center(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12.0),
+                  child: Image.network(
+                    imageUrl,
+                    fit: BoxFit.contain,
+                    loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Container(
+                        width: MediaQuery.of(context).size.width * 0.8,
+                        height: MediaQuery.of(context).size.height * 0.6,
+                        alignment: Alignment.center,
+                        child: const CircularProgressIndicator(),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      width: MediaQuery.of(context).size.width * 0.8,
+                      height: MediaQuery.of(context).size.height * 0.6,
+                      color: Colors.grey[200],
+                      child: const Center(child: Icon(Icons.error_outline, color: Colors.red, size: 50)),
+                    ),
                   ),
-               ),
-             ),
+                ),
+              ),
+            ),
           ),
         );
       },
     );
   }
 
+  // Helper method to build a review button
   Widget _buildResultButton({
     required String text,
     required Color color,
@@ -205,12 +202,12 @@ class _FlashcardBuildItemViewState extends State<FlashcardBuildItemView> {
       style: ElevatedButton.styleFrom(
         backgroundColor: color,
         foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14), 
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
         textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(30.0), 
+          borderRadius: BorderRadius.circular(30.0),
         ),
-        elevation: 4, 
+        elevation: 4,
       ),
       onPressed: onPressed,
       child: Text(text),
@@ -334,15 +331,6 @@ class _FlashcardBuildItemViewState extends State<FlashcardBuildItemView> {
                 child: Container( 
                    decoration: BoxDecoration(
                      borderRadius: BorderRadius.circular(16.0), 
-                     // boxShadow removed for cleaner look, uncomment if desired
-                     // boxShadow: [
-                     //   BoxShadow(
-                     //     color: Colors.black.withOpacity(0.2),
-                     //     spreadRadius: 1,
-                     //     blurRadius: 5,
-                     //     offset: const Offset(0, 3),
-                     //   ),
-                     // ],
                    ),
                    child: ClipRRect(
                      borderRadius: BorderRadius.circular(16.0), 

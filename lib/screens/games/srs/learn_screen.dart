@@ -519,9 +519,12 @@ class LearnScreen extends HookConsumerWidget {
             final flashcardsAsync = ref.read(flashcardStateProvider);
             if (flashcardsAsync is AsyncData<List<Flashcard>>) {
               final allFlashcards = flashcardsAsync.value;
-              final cardToUpdate = allFlashcards?.firstWhere((c) => c.id == flashcard.id, orElse: () => throw Exception('Card not found'));
-              
-              if (cardToUpdate != null) {
+              // Add null check to ensure allFlashcards is not null
+              if (allFlashcards != null) {
+                final cardToUpdate = allFlashcards.firstWhere(
+                  (c) => c.id == flashcard.id, 
+                  orElse: () => throw Exception('Card not found')
+                );
                 
                 // Create an updated flashcard object with new SRS data.
                 final updatedCard = cardToUpdate.copyWith(
@@ -539,7 +542,7 @@ class LearnScreen extends HookConsumerWidget {
                 // Persist the updated flashcard using the provider (handles sync + offline cache).
                 await ref.read(flashcardStateProvider.notifier).updateFlashcard(updatedCard);
               } else {
-                debugPrint('Error: Could not find card ${flashcard.id} to update in flashcard provider');
+                debugPrint('Error: allFlashcards is null');
               }
             }
             
@@ -557,11 +560,10 @@ class LearnScreen extends HookConsumerWidget {
             // Check if the due items list is now empty, signifying session completion.
             if (dueItemsListState.value.isEmpty) {
               sessionCompleteNotifier.value = true;
-              // Potentially show a completion message or navigate away.
             }
           }
         },
-        showTranslation: false, // Example parameter, adjust as needed
+        showTranslation: false,
       );
     }
 

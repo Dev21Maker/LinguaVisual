@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lingua_visual/models/flashcard.dart';
@@ -132,6 +134,20 @@ class _FlashcardTileState<T extends Flashcard> extends ConsumerState<FlashcardTi
               ),
             ),
             if (widget.card.imageUrl != null && widget.card.imageUrl!.isNotEmpty)
+              if(!widget.card.imageUrl!.startsWith('http')) ...{
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0, left: 16.0, right: 16.0, bottom: 8.0),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8.0),
+                    child: Image.file(
+                      File(widget.card.imageUrl!),
+                      height: 150,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+              } else ...{
               Padding(
                 padding: const EdgeInsets.only(top: 8.0, left: 16.0, right: 16.0, bottom: 8.0),
                 child: ClipRRect(
@@ -154,6 +170,7 @@ class _FlashcardTileState<T extends Flashcard> extends ConsumerState<FlashcardTi
                   ),
                 ),
               ),
+            }
           ],
         ),
       ),

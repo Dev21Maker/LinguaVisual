@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
@@ -345,62 +346,100 @@ class _FlashcardBuildItemViewState
           crossAxisAlignment: CrossAxisAlignment.center,
           children: <Widget>[
             // Image Display
-            if (flashcard.imageUrl?.isNotEmpty ?? false)
-              GestureDetector(
-                onTap: () => _showImageDialog(context, flashcard.imageUrl!),
-                child: Container(
-                  margin: const EdgeInsets.only(top: 10.0),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16.0),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16.0),
-                    child: Image.network(
-                      flashcard.imageUrl!,
-                      height: 280,
-                      width: 280,
-                      fit: BoxFit.fitHeight,
-                      loadingBuilder: (
-                        BuildContext context,
-                        Widget child,
-                        ImageChunkEvent? loadingProgress,
-                      ) {
-                        if (loadingProgress == null) return child;
-                        return Container(
-                          height: 280,
-                          width: 280,
-                          color: Colors.grey[300],
-                          child: Center(
-                            child: CircularProgressIndicator(
-                              value:
-                                  loadingProgress.expectedTotalBytes != null
-                                      ? loadingProgress.cumulativeBytesLoaded /
-                                          loadingProgress.expectedTotalBytes!
-                                      : null,
-                            ),
-                          ),
-                        );
-                      },
-                      errorBuilder:
-                          (context, error, stackTrace) => Container(
+            if (flashcard.imageUrl?.isNotEmpty ?? false) ...{
+              if(flashcard.imageUrl!.startsWith('http')) ...{
+                GestureDetector(
+                  onTap: () => _showImageDialog(context, flashcard.imageUrl!),
+                  child: Container(
+                    margin: const EdgeInsets.only(top: 10.0),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16.0),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16.0),
+                      child: Image.network(
+                        flashcard.imageUrl!,
+                        height: 280,
+                        width: 280,
+                        fit: BoxFit.fitHeight,
+                        loadingBuilder: (
+                          BuildContext context,
+                          Widget child,
+                          ImageChunkEvent? loadingProgress,
+                        ) {
+                          if (loadingProgress == null) return child;
+                          return Container(
                             height: 280,
                             width: 280,
-                            decoration: BoxDecoration(
-                              color: Colors.grey[300],
-                              borderRadius: BorderRadius.circular(16.0),
-                            ),
-                            child: const Center(
-                              child: Icon(
-                                Icons.broken_image,
-                                size: 60,
-                                color: Colors.grey,
+                            color: Colors.grey[300],
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                value:
+                                    loadingProgress.expectedTotalBytes != null
+                                        ? loadingProgress.cumulativeBytesLoaded /
+                                            loadingProgress.expectedTotalBytes!
+                                        : null,
                               ),
                             ),
-                          ),
+                          );
+                        },
+                        errorBuilder:
+                            (context, error, stackTrace) => Container(
+                              height: 280,
+                              width: 280,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[300],
+                                borderRadius: BorderRadius.circular(16.0),
+                              ),
+                              child: const Center(
+                                child: Icon(
+                                  Icons.broken_image,
+                                  size: 60,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ),
+                      ),
                     ),
                   ),
-                ),
-              )
+                )
+              } else ...{
+                GestureDetector(
+                  onTap: () => _showImageDialog(context, flashcard.imageUrl!),
+                  child: Container(
+                    margin: const EdgeInsets.only(top: 10.0),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16.0),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16.0),
+                      child: Image.file(
+                        File(flashcard.imageUrl!),
+                        height: 280,
+                        width: 280,
+                        fit: BoxFit.fitHeight,
+                        errorBuilder:
+                            (context, error, stackTrace) => Container(
+                              height: 280,
+                              width: 280,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[300],
+                                borderRadius: BorderRadius.circular(16.0),
+                              ),
+                              child: const Center(
+                                child: Icon(
+                                  Icons.broken_image,
+                                  size: 60,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ),
+                      ),
+                    ),
+                  ),
+                )
+              }
+            }
             else ...{
               // Placeholder when no image URL
               Container(

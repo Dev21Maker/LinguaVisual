@@ -18,8 +18,6 @@ class SRSManager {
   /// Returns the newly created SrsItem.
   SrsItem addItem(Flashcard itemId, {int? now}) {
 
-    print('Item Box: ${itemId.srsBaseIntervalIndex}');
-
     final srsItem = SrsItem(
       id: itemId.id,
       baseIndex: itemId.srsBaseIntervalIndex,
@@ -75,14 +73,12 @@ class SRSManager {
     try {
       // Basic validation for response string
       if (!['quick', 'got', 'missed'].contains(response)) {
-        print("Warning: Invalid response '$response' passed to recordReview.");
         // Decide how to handle invalid input: return null, throw, or default?
         // For now, let's let the SRS class handle potential typeMod errors if reviewType is bad.
       }
       return _srs.processAnswer(itemId, response, reviewType: reviewType, now: now);
     } catch (e) {
       // Catch potential ArgumentError if item not found
-      print("Error recording review for item '$itemId': $e");
       return null;
     }
   }

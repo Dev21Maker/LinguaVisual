@@ -5,6 +5,11 @@ import '../services/api_service.dart';
 import '../providers/unsplash_provider.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
+import 'dart:io';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class ImagePromptDialog extends ConsumerStatefulWidget {
   final String word;
@@ -35,6 +40,7 @@ class _ImagePromptDialogState extends ConsumerState<ImagePromptDialog> {
   String? _selectedUnsplashUrl;
   bool _isGeneratingMode = false;
   String? _generatedImageUrl;
+  String? _pickedImagePath;
 
   @override
   void initState() {
@@ -89,9 +95,40 @@ class _ImagePromptDialogState extends ConsumerState<ImagePromptDialog> {
 
   Future<void> _pickFromDevice() async {
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Device image picking is not available yet')));
+
+    final ImagePicker picker = ImagePicker();
+    try {
+      final XFile? pickedFile = await picker.pickImage(source: ImageSource.gallery);
+
+      if (pickedFile != null) {
+        final Directory appDir = await getApplicationDocumentsDirectory();
+        final String fileName = p.basename(pickedFile.path);
+        final String savePath = p.join(appDir.path, fileName);
+
+        final File imageFile = File(pickedFile.path);
+        await imageFile.copy(savePath);
+
+        if (!mounted) return;
+        setState(() {
+          _pickedImagePath = savePath;
+          _selectedUnsplashUrl = null;
+          _generatedImageUrl = null;
+          _isGeneratingMode = false;
+        });
+        widget.onImageSelected(savePath);
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Image selection cancelled.')),
+        );
+      }
+    } catch (e) {
+      print("Error picking/saving image: $e");
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error picking image: $e')),
+      );
+    }
   }
 
   Future<List<Photo>?> _pickFromUnsplash() async {
@@ -118,6 +155,10 @@ class _ImagePromptDialogState extends ConsumerState<ImagePromptDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context)!;
+    bool canSelectImage = _selectedUnsplashUrl != null || _generatedImageUrl != null || _pickedImagePath != null;
+    final l10n = AppLocalizations.of(context)!;
+    
     return AlertDialog(
       title: const Text('Add Image to Flashcard'),
       content: ConstrainedBox(
@@ -143,7 +184,6 @@ class _ImagePromptDialogState extends ConsumerState<ImagePromptDialog> {
               ),
               const SizedBox(height: 16),
 
-              // Image generation mode
               Visibility(
                 visible: _isGeneratingMode,
                 child: Column(
@@ -160,79 +200,131 @@ class _ImagePromptDialogState extends ConsumerState<ImagePromptDialog> {
                     ),
                     const SizedBox(height: 16),
                     Center(
-                      child:
-                          _generatedImageUrl != null
-                              ? ConstrainedBox(
-                                constraints: BoxConstraints(maxHeight: 300),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Image.network(
-                                    _generatedImageUrl!,
-                                    height: 200,
-                                    fit: BoxFit.fitHeight,
-                                    loadingBuilder: (context, child, loadingProgress) {
-                                      if (loadingProgress == null) return child;
-                                      return SizedBox(
-                                        height: 200,
-                                        child: Center(
-                                          child: CircularProgressIndicator(
-                                            value:
-                                                loadingProgress.expectedTotalBytes != null
-                                                    ? loadingProgress.cumulativeBytesLoaded /
-                                                        loadingProgress.expectedTotalBytes!
-                                                    : null,
-                                          ),
+                      child: _generatedImageUrl != null
+                          ? ConstrainedBox(
+                              constraints: BoxConstraints(maxHeight: 300),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Image.network(
+                                  _generatedImageUrl!,
+                                  height: 200,
+                                  fit: BoxFit.fitHeight,
+                                  loadingBuilder: (context, child, loadingProgress) {
+                                    if (loadingProgress == null) return child;
+                                    return SizedBox(
+                                      height: 200,
+                                      child: Center(
+                                        child: CircularProgressIndicator(
+                                          value: loadingProgress.expectedTotalBytes != null
+                                              ? loadingProgress.cumulativeBytesLoaded /
+                                                  loadingProgress.expectedTotalBytes!
+                                              : null,
                                         ),
-                                      );
-                                    },
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return SizedBox(
-                                        height: 200,
-                                        child: Center(child: Icon(Icons.broken_image, size: 64, color: Colors.grey)),
-                                      );
-                                    },
-                                  ),
-                                ),
-                              )
-                              : _isLoading
-                              ? Container(
-                                height: 200,
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[200],
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Center(child: CircularProgressIndicator()),
-                              )
-                              : Container(
-                                height: 200,
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[200],
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: const [
-                                      Icon(Icons.image_not_supported, size: 64, color: Colors.grey),
-                                      SizedBox(height: 8),
-                                      Text('No image generated yet', style: TextStyle(color: Colors.grey)),
-                                    ],
-                                  ),
+                                      ),
+                                    );
+                                  },
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return SizedBox(
+                                      height: 200,
+                                      child: Center(
+                                        child: Icon(Icons.broken_image, size: 64, color: Colors.grey),
+                                      ),
+                                    );
+                                  },
                                 ),
                               ),
+                            )
+                          : _isLoading
+                              ? Container(
+                                  height: 200,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[200],
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Center(child: CircularProgressIndicator()),
+                                )
+                              : Container(
+                                  height: 200,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[200],
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Center(
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: const [
+                                        Icon(Icons.image_not_supported, size: 64, color: Colors.grey),
+                                        SizedBox(height: 8),
+                                        Text('No image generated yet', style: TextStyle(color: Colors.grey)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                     ),
+                    const SizedBox(height: 16),
+                    // Buttons for Generate/Regenerate/Use Generated Image
+                    if (_isGeneratingMode)
+                      Center(
+                        child: _generatedImageUrl == null
+                            // --- Generate Button --- 
+                            ? ElevatedButton.icon(
+                                icon: const Icon(Icons.auto_awesome),
+                                label: const Text('GENERATE AI IMAGE'),
+                                onPressed: (!widget.hasConnection || _isLoading) ? null : _generateImage, // Call _generateImage
+                                style: ElevatedButton.styleFrom(
+                                  disabledBackgroundColor: Colors.grey,
+                                  disabledForegroundColor: Colors.white70,
+                                ),
+                              )
+                            // --- Regenerate and Use Buttons --- 
+                            : Row(
+                                mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  // Regenerate Button
+                                  TextButton(
+                                    onPressed: (!widget.hasConnection || _isLoading) ? null : _generateImage, // Call _generateImage
+                                    child: _isLoading
+                                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                                        : const Text('REGENERATE'),
+                                  ),
+                                  // Use This Image button is now handled by the main action button
+                                ],
+                              ),
+                      ),
+                    const SizedBox(height: 16), // Added padding after generate buttons
                   ],
                 ),
               ),
 
-              // Unsplash browsing mode
-              Visibility(visible: !_isGeneratingMode, child: _buildUnsplashImagesSection()),
+              Visibility(
+                visible: !_isGeneratingMode,
+                child: _buildUnsplashImagesSection(),
+              ),
+
+              if (_pickedImagePath != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text("Selected from Device:", style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      Center(
+                        child: Image.file(
+                          File(_pickedImagePath!),
+                          height: 150,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             ],
           ),
         ),
       ),
       actions: [
-        // Toggle mode button
         TextButton(
           onPressed: () {
             setState(() {
@@ -294,7 +386,7 @@ class _ImagePromptDialogState extends ConsumerState<ImagePromptDialog> {
                       child: const Text('USE THIS IMAGE'),
                     ),
                   ],
-                ),
+          ),
         ),
       ],
     );
@@ -347,8 +439,14 @@ class _ImagePromptDialogState extends ConsumerState<ImagePromptDialog> {
                   setState(() {
                     if (_selectedUnsplashUrl == imageUrl) {
                       _selectedUnsplashUrl = null;
+                      _pickedImagePath = null;
+                      _generatedImageUrl = null;
+                      _isGeneratingMode = false;
                     } else {
                       _selectedUnsplashUrl = imageUrl;
+                      _pickedImagePath = null;
+                      _generatedImageUrl = null;
+                      _isGeneratingMode = false;
                     }
                   });
                 },

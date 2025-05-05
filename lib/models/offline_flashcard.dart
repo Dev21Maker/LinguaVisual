@@ -9,6 +9,7 @@ class OfflineFlashcard extends Flashcard {
   final int srsQuickStreak;
   final bool srsIsPriority;
   final bool srsIsInLearningPhase;
+  final int? srsBoxValue;
 
   OfflineFlashcard({
     required super.id,
@@ -26,7 +27,8 @@ class OfflineFlashcard extends Flashcard {
     this.srsQuickStreak = 0,
     this.srsIsPriority = false,
     this.srsIsInLearningPhase = true,
-    String description = '', // Added description parameter
+    this.srsBoxValue,
+    String description = '',
   }) : super(
           srsInterval: srsInterval,
           srsEaseFactor: srsEaseFactor,
@@ -37,6 +39,7 @@ class OfflineFlashcard extends Flashcard {
           srsQuickStreak: srsQuickStreak,
           srsIsPriority: srsIsPriority,
           srsIsInLearningPhase: srsIsInLearningPhase,
+          srsBoxValue: srsBoxValue,
         );
 
   factory OfflineFlashcard.fromMap(Map<String, dynamic> map) {
@@ -54,9 +57,10 @@ class OfflineFlashcard extends Flashcard {
       srsLastReviewDate: map['srs_last_review_date'] as int?,
       srsBaseIntervalIndex: map['srs_base_interval_index'] as int? ?? 0,
       srsQuickStreak: map['srs_quick_streak'] as int? ?? 0,
-      srsIsPriority: (map['srs_is_priority'] as int? ?? 0) == 1, // Assuming stored as 0/1 int
-      srsIsInLearningPhase: (map['srs_is_in_learning_phase'] as int? ?? 1) == 1, // Assuming stored as 0/1 int
-      description: map['description'] as String? ?? '', // Added description from map
+      srsIsPriority: (map['srs_is_priority'] as int? ?? 0) == 1,
+      srsIsInLearningPhase: (map['srs_is_in_learning_phase'] as int? ?? 1) == 1,
+      srsBoxValue: map['srs_box_value'] as int?,
+      description: map['description'] as String? ?? '',
     );
   }
 
@@ -75,8 +79,9 @@ class OfflineFlashcard extends Flashcard {
       'srs_last_review_date': srsLastReviewDate,
       'srs_base_interval_index': srsBaseIntervalIndex,
       'srs_quick_streak': srsQuickStreak,
-      'srs_is_priority': srsIsPriority ? 1 : 0, // Store bool as int
-      'srs_is_in_learning_phase': srsIsInLearningPhase ? 1 : 0, // Store bool as int
+      'srs_is_priority': srsIsPriority ? 1 : 0,
+      'srs_is_in_learning_phase': srsIsInLearningPhase ? 1 : 0,
+      'srs_box_value': srsBoxValue,
       'description': description,
     };
   }
@@ -95,11 +100,12 @@ class OfflineFlashcard extends Flashcard {
     int? srsLastReviewDate,
     DateTime? createdAt,
     DateTime? updatedAt,
-    String? description, // Added description parameter
+    String? description,
     int? srsBaseIntervalIndex,
     int? srsQuickStreak,
     bool? srsIsPriority,
     bool? srsIsInLearningPhase,
+    int? srsBoxValue,
   }) {
     return OfflineFlashcard(
       id: id ?? this.id,
@@ -113,11 +119,12 @@ class OfflineFlashcard extends Flashcard {
       srsEaseFactor: srsEaseFactor ?? this.srsEaseFactor,
       srsNextReviewDate: srsNextReviewDate ?? this.srsNextReviewDate,
       srsLastReviewDate: srsLastReviewDate ?? this.srsLastReviewDate,
-      description: description ?? this.description, // Added description to copyWith
+      description: description ?? this.description,
       srsBaseIntervalIndex: srsBaseIntervalIndex ?? this.srsBaseIntervalIndex,
       srsQuickStreak: srsQuickStreak ?? this.srsQuickStreak,
       srsIsPriority: srsIsPriority ?? this.srsIsPriority,
       srsIsInLearningPhase: srsIsInLearningPhase ?? this.srsIsInLearningPhase,
+      srsBoxValue: srsBoxValue ?? this.srsBoxValue,
     );
   }
 }

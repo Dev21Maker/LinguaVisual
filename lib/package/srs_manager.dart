@@ -16,8 +16,24 @@ class SRSManager {
   ///
   /// Throws an ArgumentError if an item with the same ID already exists.
   /// Returns the newly created SrsItem.
-  SrsItem addItem(String itemId, {int? now}) {
-    return _srs.addItem(itemId, now: now);
+  SrsItem addItem(Flashcard itemId, {int? now}) {
+
+    print('Item Box: ${itemId.srsBaseIntervalIndex}');
+
+    final srsItem = SrsItem(
+      id: itemId.id,
+      baseIndex: itemId.srsBaseIntervalIndex,
+      nextReview: itemId.srsNextReviewDate,
+      lastInterval: itemId.srsInterval,
+      streakQuick: itemId.srsQuickStreak,
+      timesSeenToday: 0,
+      pdf: itemId.srsEaseFactor,
+      // Prefer the actual box value if available, otherwise use base interval index if in learning phase
+      box: itemId.srsIsInLearningPhase ? (itemId.srsBoxValue ?? itemId.srsBaseIntervalIndex) : null,
+      lastSeenDay: itemId.srsLastReviewDate != null ? _srs.utcDateStr(itemId.srsLastReviewDate!) : _srs.utcDateStr(_srs.now()),
+    );
+
+    return _srs.addItem(srsItem, now: now);
   }
 
   /// Loads or updates an item in the SRS system based on Flashcard data.
@@ -29,9 +45,9 @@ class SRSManager {
     // Create SrsItem state from Flashcard data
     final srsItem = SrsItem(
         id: card.id,
-        // If Flashcard is in learning phase, use its baseIndex as the Leitner box number.
+        // If Flashcard is in learning phase, use its box value if available, otherwise use baseIndex
         // Otherwise (graduated), box is null.
-        box: card.srsIsInLearningPhase ? card.srsBaseIntervalIndex : null,
+        box: card.srsIsInLearningPhase ? (card.srsBoxValue ?? card.srsBaseIntervalIndex) : null,
         pdf: card.srsEaseFactor, // Maps directly
         // BaseIndex in SrsItem tracks the long-term interval step.
         // Use the value from Flashcard directly.

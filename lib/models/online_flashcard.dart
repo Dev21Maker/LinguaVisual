@@ -17,6 +17,7 @@ class OnlineFlashcard extends Flashcard {
   final int srsQuickStreak;
   final bool srsIsPriority;
   final bool srsIsInLearningPhase;
+  final int? srsBoxValue;
 
   OnlineFlashcard({
     required String id,
@@ -38,7 +39,8 @@ class OnlineFlashcard extends Flashcard {
     this.srsQuickStreak = 0,
     this.srsIsPriority = false,
     this.srsIsInLearningPhase = true,
-    String description = '', // Added description parameter
+    this.srsBoxValue,
+    String description = '',
   }) : super(
           id: id,
           word: word,
@@ -57,6 +59,7 @@ class OnlineFlashcard extends Flashcard {
           srsQuickStreak: srsQuickStreak,
           srsIsPriority: srsIsPriority,
           srsIsInLearningPhase: srsIsInLearningPhase,
+          srsBoxValue: srsBoxValue,
         );
 
   OnlineFlashcard copyWith({
@@ -74,12 +77,13 @@ class OnlineFlashcard extends Flashcard {
     DateTime? createdAt,
     DateTime? updatedAt,
     List<String>? stackIds,
-    String? description, // Added description parameter
+    String? description,
     // Add new fields to copyWith
     int? srsBaseIntervalIndex,
     int? srsQuickStreak,
     bool? srsIsPriority,
     bool? srsIsInLearningPhase,
+    int? srsBoxValue,
   }) {
     return OnlineFlashcard(
       id: id ?? this.id,
@@ -96,12 +100,13 @@ class OnlineFlashcard extends Flashcard {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       stackIds: stackIds ?? this.stackIds,
-      description: description ?? this.description, // Added description to copyWith
+      description: description ?? this.description,
       // Use new fields in copyWith
       srsBaseIntervalIndex: srsBaseIntervalIndex ?? this.srsBaseIntervalIndex,
       srsQuickStreak: srsQuickStreak ?? this.srsQuickStreak,
       srsIsPriority: srsIsPriority ?? this.srsIsPriority,
       srsIsInLearningPhase: srsIsInLearningPhase ?? this.srsIsInLearningPhase,
+      srsBoxValue: srsBoxValue ?? this.srsBoxValue,
     );
   }
 
@@ -122,12 +127,13 @@ class OnlineFlashcard extends Flashcard {
       'created_at': createdAt?.toIso8601String() ?? now.toIso8601String(),
       'updated_at': now.toIso8601String(),
       'stack_ids': stackIds,
-      'description': description, // Added description to map
+      'description': description, 
       // Add new fields to map
       'srs_base_interval_index': srsBaseIntervalIndex,
       'srs_quick_streak': srsQuickStreak,
       'srs_is_priority': srsIsPriority ? 1 : 0, // Store bool as int
       'srs_is_in_learning_phase': srsIsInLearningPhase ? 1 : 0, // Store bool as int
+      'srs_box_value': srsBoxValue, // Add box value to map
     };
   }
 
@@ -202,12 +208,13 @@ class OnlineFlashcard extends Flashcard {
       createdAt: parseDateTime(map['created_at']),
       updatedAt: parseDateTime(map['updated_at']),
       stackIds: List<String>.from(map['stack_ids'] ?? []),
-      description: map['description'] as String? ?? '', // Added description from map
+      description: map['description'] as String? ?? '', 
       // Read new fields from map with defaults, using parseInt for ints
       srsBaseIntervalIndex: parseInt(map['srs_base_interval_index']), 
       srsQuickStreak: parseInt(map['srs_quick_streak']), 
       srsIsPriority: (map['srs_is_priority'] == true || map['srs_is_priority'] == 1), // Handle bool or int
       srsIsInLearningPhase: (map['srs_is_in_learning_phase'] == true || map['srs_is_in_learning_phase'] == 1), // Handle bool or int
+      srsBoxValue: parseInt(map['srs_box_value']), // Extract box value from map
     );
   }
 

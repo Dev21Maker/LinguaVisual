@@ -93,24 +93,12 @@ class SRS {
   ).toIso8601String().substring(0, 10); // YYYY-MM-DD
 
   // ───────── PUBLIC API ─────────
-  SrsItem addItem(String id, {int? now}) {
-    if (items.containsKey(id)) {
-      throw ArgumentError("Item '$id' already exists");
+  SrsItem addItem(SrsItem item, {int? now}) {
+    if (items.containsKey(item.id)) {
+      throw ArgumentError("Item '${item.id}' already exists");
     }
-    final currentTime = now ?? this.now();
-    final newItem = SrsItem(
-      id: id,
-      box: 0, // Start in the first Leitner box
-      pdf: 1.0,
-      baseIndex: 0, // Not used until graduation
-      nextReview: currentTime + boxWait[0],
-      lastInterval: boxWait[0].toDouble(),
-      streakQuick: 0,
-      timesSeenToday: 0,
-      lastSeenDay: utcDateStr(currentTime),
-    );
-    items[id] = newItem;
-    return newItem;
+    items[item.id] = item;
+    return item;
   }
 
   List<SrsItem> dueItems({int? now}) {
@@ -156,10 +144,12 @@ class SRS {
     if (correct) {
       final int hop = (resp == 'quick') ? 2 : 1; // quick ⇒ double promotion
       // Use clamp to ensure box stays within bounds and calculate in a single step
+      print('1 box: ${itm.box}');
       itm.box = clamp(itm.box! + hop, 0, boxWait.length - 1);
-
+      print('2 box: ${itm.box}');
       // Graduation check - only graduate when in the last box (not when exceeding it)
       if (itm.box == boxWait.length - 1) {
+        print('3 box: ${itm.box}');
         itm.box = null; // Switch to long-term
         itm.baseIndex = 0; // Start at the first base step
         final double interval = baseSteps[0] * itm.pdf; // Initial long-term interval
@@ -170,13 +160,18 @@ class SRS {
       }
     } else {
       // Miss ⇒ demote once (not below 0)
+      print('4 box: ${itm.box}');
       itm.box = clamp(itm.box! - 1, 0, boxWait.length - 1);
     }
 
     // Schedule next wait inside session using the current box index
     final int wait = boxWait[itm.box!];
-    itm.lastInterval = wait.toDouble(); // Store the Leitner wait as last interval
+    print('1 wait: ${wait}');
+    itm.lastInterval = wait.toDouble();
+    print('2 wait: ${wait}');
+    print('1 nextReview: ${itm.nextReview}'); // Store the Leitner wait as last interval
     itm.nextReview = now + wait;
+    print('2 nextReview: ${itm.nextReview}');
   }
 
 
@@ -185,6 +180,7 @@ class SRS {
     final double typeM = typeMod[reviewType] ?? 1.0;
     final bool correct = (resp == 'quick' || resp == 'got');
 
+    print('1 PDF: ${itm.pdf}');
     // 1️⃣ PDF adjust
     if (resp == 'quick') {
       itm.pdf = clamp(itm.pdf + 0.15, 0.5, 2.0);
@@ -196,14 +192,18 @@ class SRS {
       // PDF doesn't change explicitly for 'got', but streak resets
       itm.streakQuick = 0;
     }
+    print('2 PDF: ${itm.pdf}');
 
+    print('1 BaseIndex: ${itm.baseIndex}');
     // 2️⃣ Ladder index movement
     if (correct) {
       itm.baseIndex = clamp(itm.baseIndex + 1, 0, baseSteps.length - 1);
     } else { // missed
       itm.baseIndex = clamp(itm.baseIndex - 2, 0, baseSteps.length - 1); // Go back 2 steps, floor 0
     }
+    print('2 baseIndex: ${itm.baseIndex}');
 
+    print('1 interval: ${itm.lastInterval}');
     // 3️⃣ Compute raw interval
     double interval = baseSteps[itm.baseIndex] * itm.pdf * typeM;
 
@@ -214,26 +214,32 @@ class SRS {
     if (now >= itm.nextReview && (now - itm.nextReview <= itm.lastInterval)) {
         interval *= 1.05;
     }
+    print('2 interval: ${interval}');
 
     // Streak bonus (apply *after* on-time bonus, only if correct)
     // Apply every 3 *consecutive* quick answers
     if (correct && itm.streakQuick > 0 && itm.streakQuick % 3 == 0) {
         interval *= 1.10;
     }
-
+    print('3 interval: ${interval}');
 
     // 5️⃣ Load‑aware stretch
     interval *= _loadFactor(now);
+    print('4 interval: ${interval}');
 
     // 6️⃣ Caps - Use the combined approach from srs_web_app for better results
     // Apply both soft cap and hard cap in a single operation
     interval = min(interval, min(itm.lastInterval * 2.5, maxCap.toDouble()));
+    print('5 interval: ${interval}');
 
     // Ensure minimum interval (e.g., prevent 0 or negative interval after penalties)
     interval = max(interval, 3600000.0); // Minimum 1 hour interval
+    print('6 interval: ${interval}');
 
     itm.lastInterval = interval;
+    print('1 nextReview: ${itm.nextReview}');
     itm.nextReview = now + interval.round();
+    print('2 nextReview: ${itm.nextReview}');
   }
 
   // ───────── private: load factor ─────────

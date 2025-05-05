@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:lingua_visual/main.dart' show HomeScreen;
 import 'package:lingua_visual/models/flashcard.dart';
 import 'package:lingua_visual/providers/flashcard_provider.dart';
 import 'package:lingua_visual/providers/stack_provider.dart';
@@ -9,6 +10,9 @@ import 'package:lingua_visual/widgets/flashcard_view.dart';
 import 'package:lingua_visual/package/srs_manager.dart' as srs_package;
 import 'package:lingua_visual/package/algorithm/adaptive_flow_algorithm.dart' show SrsItem;
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:lingua_visual/providers/ad_provider.dart';
+import 'package:lingua_visual/widgets/banner_ad_widget.dart';
+import 'package:lingua_visual/screens/games/srs/learn_summary_screen.dart';
 
 // LearnScreen Widget: Manages the Spaced Repetition System (SRS) learning session.
 class LearnScreen extends HookConsumerWidget {
@@ -35,6 +39,20 @@ class LearnScreen extends HookConsumerWidget {
     final srsManager = useMemoized(() => srs_package.SRSManager(), []);
     // Controls visibility of the 'Load More Cards' option when initial due list is empty.
     final showLoadMoreOption = useState(false);
+    
+    // Watch ad settings from provider
+    final adSettingsAsync = ref.watch(adSettingsProvider);
+    // Track whether to show ads - default to true until we know otherwise
+    final shouldShowAds = useState(true);
+    
+    // Update shouldShowAds based on ad settings when they change
+    useEffect(() {
+      if (adSettingsAsync.hasValue) {
+        final adSettings = adSettingsAsync.value!;
+        shouldShowAds.value = adSettings.displayStrategy != AdDisplayStrategy.never;
+      }
+      return null;
+    }, [adSettingsAsync]);
 
     // Get localization object
     final l10n = AppLocalizations.of(context)!;
@@ -96,7 +114,8 @@ class LearnScreen extends HookConsumerWidget {
         
         // Add filtered flashcards to SRS manager
         for (final Flashcard card in filteredFlashcards) {
-          srsManager.loadOrUpdateItemFromFlashcard(card);
+          srsManager.addItem(card);
+          // srsManager.loadOrUpdateItemFromFlashcard(card);
         }
         
         // Get due items
@@ -336,133 +355,37 @@ class LearnScreen extends HookConsumerWidget {
         int quickCount = reviewedState.value.values.where((item) => item.$2 == l10n.learnRatingQuick).length;
         int goodCount = reviewedState.value.values.where((item) => item.$2 == l10n.learnRatingGood).length;
         int missedCount = reviewedState.value.values.where((item) => item.$2 == l10n.learnRatingMissed).length;
+        
+        // Calculate session duration (approximate)
+        final sessionDuration = Duration(minutes: reviewedState.value.length * 1); // Estimate 1 minute per card
 
-        return Center(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.check_circle_outline, color: Colors.green, size: 64),
-                const SizedBox(height: 24),
-                Text(
-                  l10n.learnSessionCompleteTitle,
-                  style: Theme.of(context).textTheme.headlineMedium,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  l10n.learnSessionCompleteSubtitle,
-                  style: Theme.of(context).textTheme.bodyLarge,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 32),
-                Card(
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          l10n.learnReviewSummaryTitle,
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(l10n.learnSummaryQuickLabel, style: const TextStyle(color: Colors.blue)),
-                            Text('$quickCount'),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(l10n.learnSummaryGoodLabel, style: const TextStyle(color: Colors.green)),
-                            Text('$goodCount'),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(l10n.learnSummaryMissedLabel, style: const TextStyle(color: Colors.red)),
-                            Text('$missedCount'),
-                          ],
-                        ),
-                      ],
+        // Navigate to the summary screen
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => LearnSummaryScreen(
+                cardsReviewed: reviewedState.value.length,
+                correctAnswers: goodCount,
+                quickAnswers: quickCount,
+                missedAnswers: missedCount,
+                sessionDuration: sessionDuration,
+                onContinue: () {
+                  // Navigate back to the learn screen to start a new session
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(
+                      builder: (context) => const HomeScreen(),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 32),
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.arrow_back),
-                  label: Text(MaterialLocalizations.of(context).backButtonTooltip),
-                  onPressed: () => Navigator.of(context).pop(), // Go back
-                ),
-              ],
+                  );
+                },
+                onLoadMoreCards: dueItems.isEmpty ? loadNextClosestCards : null,
+              ),
             ),
-          ),
-        );
-      }
+          );
+        });
 
-      // --- No Cards Available or Due State ---
-      if (showEmpty || (dueItems.isEmpty && !isLoading && error == null && !showLoadMoreOption.value)) {
-        // Special case: Initial load was empty, offer to load more
-        if (showLoadMoreOption.value) {
-            return Center(
-                child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                            const Icon(Icons.hourglass_empty, size: 48, color: Colors.grey),
-                            const SizedBox(height: 16),
-                            Text(l10n.learnNoCardsDueNow, style: Theme.of(context).textTheme.headlineSmall, textAlign: TextAlign.center),
-                            const SizedBox(height: 8),
-                            Text(l10n.learnLoadNextClosestPrompt, textAlign: TextAlign.center),
-                            const SizedBox(height: 24),
-                            ElevatedButton(
-                                onPressed: loadNextClosestCards,
-                                child: Text(l10n.learnLoadCardsButton),
-                            ),
-                        ],
-                    ),
-                ),
-            );
-        }
-
-        // General empty state
-        return Center(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.inbox, size: 48, color: Colors.grey),
-                const SizedBox(height: 16),
-                Text(
-                  l10n.learnNoCardsAvailableTitle,
-                  style: Theme.of(context).textTheme.headlineSmall,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  l10n.learnNoCardsAvailableSubtitle,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.refresh),
-                  label: Text(l10n.learnLoadCardsButton),
-                  onPressed: reloadFunction, // Try loading again
-                ),
-              ],
-            ),
-          ),
+        // Return a loading indicator while we're navigating away
+        return const Center(
+          child: CircularProgressIndicator(),
         );
       }
 
@@ -535,6 +458,7 @@ class LearnScreen extends HookConsumerWidget {
                   srsBaseIntervalIndex: updatedItem.baseIndex,
                   srsQuickStreak: updatedItem.streakQuick,
                   srsIsInLearningPhase: updatedItem.box != null,
+                  srsBoxValue: updatedItem.box, // Add box value to preserve it between sessions
                 );
                 
                 debugPrint('Updating flashcard: ${updatedCard.word} with new next review date: ${DateTime.fromMillisecondsSinceEpoch(updatedCard.srsNextReviewDate).toIso8601String()}');
@@ -606,6 +530,13 @@ class LearnScreen extends HookConsumerWidget {
           srsManager, // Pass the SRS manager instance
           ref, // Pass the WidgetRef
         ),
+        // Add banner ad at the bottom if ads should be shown
+        bottomNavigationBar: shouldShowAds.value 
+          ? const SizedBox(
+              height: 60,
+              child: BannerAdWidget(),
+            )
+          : null,
       ),
     );
   }

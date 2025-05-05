@@ -34,7 +34,20 @@ class _FlashcardViewState extends State<FlashcardView> {
   @override
   Widget build(BuildContext context) {
     if (widget.flashcards.isEmpty) {
-      return const Center(child: Text('No cards available'));
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.sentiment_dissatisfied, size: 48, color: Colors.grey),
+            const SizedBox(height: 16),
+            Text('No flashcards available', 
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
+            const SizedBox(height: 8),
+            Text('Add some cards to start learning!', 
+                style: TextStyle(color: Colors.grey[600])),
+          ],
+        ),
+      );
     }
 
     return CardSwiper(
@@ -336,6 +349,7 @@ class _FlashcardBuildItemViewState
               GestureDetector(
                 onTap: () => _showImageDialog(context, flashcard.imageUrl!),
                 child: Container(
+                  margin: const EdgeInsets.only(top: 10.0),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(16.0),
                   ),
@@ -392,6 +406,7 @@ class _FlashcardBuildItemViewState
               Container(
                 height: 280,
                 width: 280,
+                margin: const EdgeInsets.only(top: 10.0),
                 decoration: BoxDecoration(
                   color: Colors.blueGrey[50],
                   borderRadius: BorderRadius.circular(16.0),

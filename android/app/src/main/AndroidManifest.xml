@@ -4,6 +4,9 @@
         android:label="lingua_visual"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon">
+        <meta-data
+        android:name="com.google.android.gms.ads.APPLICATION_ID"
+        android:value="ca-app-pub-9881290136478504~8363186461"/>
         <activity
             android:name=".MainActivity"
             android:exported="true"

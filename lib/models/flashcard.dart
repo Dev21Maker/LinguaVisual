@@ -16,6 +16,7 @@ abstract class Flashcard {
   final int srsQuickStreak;
   final bool srsIsPriority;
   final bool srsIsInLearningPhase;
+  final int? srsBoxValue; // Added to track the SRS box value
 
   Flashcard({
     required this.id,
@@ -34,5 +35,6 @@ abstract class Flashcard {
     this.srsQuickStreak = 0,
     this.srsIsPriority = false,
     this.srsIsInLearningPhase = true,
+    this.srsBoxValue, // Default to null
   });
 }

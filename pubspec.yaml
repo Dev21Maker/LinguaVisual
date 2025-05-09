@@ -32,6 +32,8 @@ dependencies:
   image_picker: ^1.1.2
   flutter_native_splash: ^2.4.6
   flutter_tts: ^3.8.5 # Or the latest version
+  flutter_svg: ^2.0.10+1
+  google_sign_in: ^6.2.1 # ADDED for Firebase Google Sign-In
   # multi_language_srs:
   #   git:
   #     url: https://github.com/Dev21Maker/MultiSRS.git
@@ -59,3 +61,6 @@ flutter:
   assets:
     - .env
     - assets/
+    - assets/images/login_background.png
+    - assets/images/placeholder_login_bg.png
+    - assets/images/google_icon.svg

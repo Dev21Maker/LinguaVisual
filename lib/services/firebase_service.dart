@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lingua_visual/models/flashcard_stack.dart';
 import '../models/online_flashcard.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class FirebaseService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -24,6 +25,34 @@ class FirebaseService {
 
   Future<void> signOut() async {
     await _auth.signOut();
+  }
+
+  // Sign in with Google
+  Future<UserCredential?> signInWithGoogle() async {
+    try {
+      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+
+      if (googleUser == null) {
+        // User cancelled the sign-in process
+        return null;
+      }
+
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final AuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      return await _auth.signInWithCredential(credential);
+    } on FirebaseAuthException catch (e) {
+      // Log or handle Firebase specific errors
+      print('FirebaseService: FirebaseAuthException during Google Sign-In: ${e.code} - ${e.message}');
+      rethrow;
+    } catch (e) {
+      // Log or handle other errors (e.g., network, Google Play services issues)
+      print('FirebaseService: Generic error during Google Sign-In: $e');
+      rethrow;
+    }
   }
 
   // Auth state

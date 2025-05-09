@@ -53,16 +53,32 @@
   "learnSummaryGoodLabel": "Good:",
   "learnSummaryMissedLabel": "Missed:",
   "learnSummaryQuickLabel": "Quick:",
-  "loginAuthError": "Authentication error",
+  "loginAuthError": "Authentication error. Please check your credentials.",
   "loginEmailEmptyValidation": "Please enter your email",
   "loginEmailInvalidValidation": "Please enter a valid email",
   "loginEmailLabel": "Email",
+  "loginGoogleSignInCancelled": "Google Sign-In was cancelled.",
+  "@loginGoogleSignInCancelled": {
+    "description": "Message shown when the user cancels the Google Sign-In process."
+  },
+  "loginGoogleAccountExists": "An account already exists with this email using a different sign-in method. Please sign in using your original method.",
+  "@loginGoogleAccountExists": {
+    "description": "Error message when Google Sign-In email is already associated with a non-Google account."
+  },
+  "loginGoogleInvalidCredential": "The Google sign-in credential was invalid or has expired. Please try again.",
+  "@loginGoogleInvalidCredential": {
+    "description": "Error message when Google Sign-In credential is no longer valid."
+  },
+  "loginGoogleSignInFailed": "Google Sign-In failed. Please check your internet connection and try again.",
+  "@loginGoogleSignInFailed": {
+    "description": "Generic error message for Google Sign-In failure."
+  },
   "loginKeepSignedIn": "Keep me signed in",
   "loginPasswordEmptyValidation": "Please enter your password",
   "loginPasswordLabel": "Password",
   "loginSignInButton": "Sign In",
   "loginSignUpPrompt": "Don't have an account? Sign Up",
-  "loginUnexpectedError": "An unexpected error occurred",
+  "loginUnexpectedError": "An unexpected error occurred. Please try again.",
   "loginWelcomeBack": "Welcome Back",
   "navFlashcards": "Flashcards",
   "navLearn": "Learn",
@@ -160,6 +176,7 @@
   "signUpEmailEmptyValidation": "Please enter your email",
   "signUpEmailInvalidValidation": "Please enter a valid email",
   "signUpEmailLabel": "Email",
+  "signUpNameHint": "Full Name",
   "signUpPasswordEmptyValidation": "Please enter a password",
   "signUpPasswordLabel": "Password",
   "signUpPasswordLengthValidation": "Password must be at least 6 characters",

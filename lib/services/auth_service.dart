@@ -60,6 +60,30 @@ class AuthService {
     return response;
   }
 
+  // ADDED: Sign in with Google
+  Future<UserCredential?> signInWithGoogle() async {
+    try {
+      final UserCredential? userCredential = await _firebase.signInWithGoogle();
+      if (userCredential?.user != null) {
+        // For consistency with email/password, mark as 'keep logged in'
+        await setKeepLoggedIn(true);
+
+        // Save the user ID to SharedPreferences, similar to signUp
+        final prefs = await SharedPreferences.getInstance();
+        const key = 'loggedInUserIds'; 
+        final List<String> userIds = prefs.getStringList(key) ?? [];
+        if (!userIds.contains(userCredential!.user!.uid)) {
+          userIds.add(userCredential.user!.uid);
+          await prefs.setStringList(key, userIds);
+        }
+      }
+      return userCredential;
+    } catch (e) {
+      print('AuthService: Google Sign-In failed: $e');
+      rethrow; 
+    }
+  }
+
   // Sign out with check for keep logged in
   Future<void> signOut({bool force = false}) async {
     // Store the current userId *before* signing out

@@ -157,11 +157,11 @@ class MyApp extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider);
+    final currentLocale = ref.watch(localeProvider); // Use this for MaterialApp.locale
     final navigatorKey = ref.watch(navigatorKeyProvider);
 
-    final settings = ref.watch(settingsProvider);
     final themeMode = settings.isDarkMode ? ThemeMode.dark : ThemeMode.light;
-    final currentLocale = ref.watch(localeProvider);
 
     useEffect(() {
       final connectivity = Connectivity();

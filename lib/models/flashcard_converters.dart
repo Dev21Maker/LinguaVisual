@@ -1,6 +1,6 @@
-import 'package:lingua_visual/models/flashcard.dart' show Flashcard;
-import 'package:lingua_visual/models/offline_flashcard.dart';
-import 'package:lingua_visual/package/models/flashcard_item.dart';
+import 'package:Languador/models/flashcard.dart' show Flashcard;
+import 'package:Languador/models/offline_flashcard.dart';
+import 'package:Languador/package/models/flashcard_item.dart';
 // import 'package:multi_language_srs/multi_language_srs.dart';
 import 'online_flashcard.dart';
 

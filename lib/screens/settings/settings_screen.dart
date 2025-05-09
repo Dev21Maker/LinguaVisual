@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:lingua_visual/models/language.dart';
-import 'package:lingua_visual/providers/auth_provider.dart' as auth_prov;
-import 'package:lingua_visual/providers/flashcard_provider.dart';
-import 'package:lingua_visual/providers/settings_provider.dart';
-import 'package:lingua_visual/providers/locale_provider.dart';
-import 'package:lingua_visual/providers/stack_provider.dart';
+import 'package:Languador/models/language.dart';
+import 'package:Languador/providers/auth_provider.dart' as auth_prov;
+import 'package:Languador/providers/flashcard_provider.dart';
+import 'package:Languador/providers/settings_provider.dart';
+import 'package:Languador/providers/locale_provider.dart';
+import 'package:Languador/providers/stack_provider.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});

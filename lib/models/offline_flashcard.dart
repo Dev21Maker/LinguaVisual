@@ -1,4 +1,4 @@
-import 'package:lingua_visual/models/flashcard.dart';
+import 'package:Languador/models/flashcard.dart';
 
 class OfflineFlashcard extends Flashcard {
   final double srsInterval;

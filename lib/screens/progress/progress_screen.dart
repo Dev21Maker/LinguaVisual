@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:lingua_visual/providers/statistics_provider.dart';
+import 'package:Languador/providers/statistics_provider.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class ProgressScreen extends ConsumerWidget {

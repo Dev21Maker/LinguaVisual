@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:lingua_visual/models/online_flashcard.dart';
-import 'package:lingua_visual/providers/flashcard_provider.dart';
+import 'package:Languador/models/online_flashcard.dart';
+import 'package:Languador/providers/flashcard_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../models/flashcard_stack.dart';

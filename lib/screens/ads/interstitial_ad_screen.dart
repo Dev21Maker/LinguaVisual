@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:lingua_visual/services/ad_service.dart';
+import 'package:Languador/services/ad_service.dart';
 
 /// A screen that shows an interstitial ad and then navigates to the next screen
 /// This is typically shown at natural transition points in the app

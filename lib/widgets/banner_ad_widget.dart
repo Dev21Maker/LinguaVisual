@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:lingua_visual/services/ad_service.dart';
+import 'package:Languador/services/ad_service.dart';
 
 /// A widget that displays a banner ad
 /// This can be placed at the top or bottom of any screen

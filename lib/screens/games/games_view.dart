@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:lingua_visual/screens/games/srs/learn_screen.dart';
+import 'package:Languador/screens/games/srs/learn_screen.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class GamesView extends StatelessWidget {

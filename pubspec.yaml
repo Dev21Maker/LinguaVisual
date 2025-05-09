@@ -1,7 +1,7 @@
-name: lingua_visual
-description: "A new Flutter project."
+name: Languador
+description: "Languador - The best way to learn languages"
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.1-beta
 
 environment:
   sdk: ^3.7.0

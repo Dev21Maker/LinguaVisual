@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:lingua_visual/providers/stack_provider.dart';
+import 'package:Languador/providers/stack_provider.dart';
 import '../../models/flashcard_stack.dart';
 import '../../providers/flashcard_provider.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';

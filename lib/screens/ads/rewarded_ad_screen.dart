@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:lingua_visual/services/ad_service.dart';
+import 'package:Languador/services/ad_service.dart';
 
 /// A screen that shows a rewarded ad and provides a reward to the user
 /// This is typically shown when the user wants to get a reward for watching an ad

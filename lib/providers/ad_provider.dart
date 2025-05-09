@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:lingua_visual/screens/ads/rewarded_ad_screen.dart';
+import 'package:Languador/screens/ads/rewarded_ad_screen.dart';
 
 /// Enum for different ad display strategies
 enum AdDisplayStrategy {

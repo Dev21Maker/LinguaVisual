@@ -2,8 +2,8 @@ import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:lingua_visual/models/flashcard.dart';
-import 'package:lingua_visual/package/algorithm/adaptive_flow_algorithm.dart' show SrsItem;
+import 'package:Languador/models/flashcard.dart';
+import 'package:Languador/package/algorithm/adaptive_flow_algorithm.dart' show SrsItem;
 
 /// Enum representing the different sides of a flashcard
 enum CardSide {

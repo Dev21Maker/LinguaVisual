@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:lingua_visual/models/offline_flashcard.dart';
-import 'package:lingua_visual/models/online_flashcard.dart';
-import 'package:lingua_visual/models/language.dart';
-import 'package:lingua_visual/providers/connectivity_provider.dart';
-import 'package:lingua_visual/providers/offline_flashcard_provider.dart';
-import 'package:lingua_visual/providers/settings_provider.dart';
-import 'package:lingua_visual/providers/flashcard_provider.dart';
-import 'package:lingua_visual/providers/stack_provider.dart';
+import 'package:Languador/models/offline_flashcard.dart';
+import 'package:Languador/models/online_flashcard.dart';
+import 'package:Languador/models/language.dart';
+import 'package:Languador/providers/connectivity_provider.dart';
+import 'package:Languador/providers/offline_flashcard_provider.dart';
+import 'package:Languador/providers/settings_provider.dart';
+import 'package:Languador/providers/flashcard_provider.dart';
+import 'package:Languador/providers/stack_provider.dart';
 import 'package:uuid/uuid.dart';
 
 class FlashCardBuilder extends StatelessWidget {

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:lingua_visual/providers/tab_index_provider.dart';
-import 'package:lingua_visual/screens/flashcards/flashcard_screen.dart';
-import 'package:lingua_visual/screens/games/games_view.dart';
-import 'package:lingua_visual/screens/progress/progress_screen.dart';
-import 'package:lingua_visual/screens/settings/settings_screen.dart';
+import 'package:Languador/providers/tab_index_provider.dart';
+import 'package:Languador/screens/flashcards/flashcard_screen.dart';
+import 'package:Languador/screens/games/games_view.dart';
+import 'package:Languador/screens/progress/progress_screen.dart';
+import 'package:Languador/screens/settings/settings_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});

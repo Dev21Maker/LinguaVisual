@@ -2,17 +2,17 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:lingua_visual/main.dart' show HomeScreen;
-import 'package:lingua_visual/models/flashcard.dart';
-import 'package:lingua_visual/providers/flashcard_provider.dart';
-import 'package:lingua_visual/providers/stack_provider.dart';
-import 'package:lingua_visual/widgets/flashcard_view.dart';
-import 'package:lingua_visual/package/srs_manager.dart' as srs_package;
-import 'package:lingua_visual/package/algorithm/adaptive_flow_algorithm.dart' show SrsItem;
+import 'package:Languador/main.dart' show HomeScreen;
+import 'package:Languador/models/flashcard.dart';
+import 'package:Languador/providers/flashcard_provider.dart';
+import 'package:Languador/providers/stack_provider.dart';
+import 'package:Languador/widgets/flashcard_view.dart';
+import 'package:Languador/package/srs_manager.dart' as srs_package;
+import 'package:Languador/package/algorithm/adaptive_flow_algorithm.dart' show SrsItem;
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:lingua_visual/providers/ad_provider.dart';
-import 'package:lingua_visual/widgets/banner_ad_widget.dart';
-import 'package:lingua_visual/screens/games/srs/learn_summary_screen.dart';
+import 'package:Languador/providers/ad_provider.dart';
+import 'package:Languador/widgets/banner_ad_widget.dart';
+import 'package:Languador/screens/games/srs/learn_summary_screen.dart';
 
 // LearnScreen Widget: Manages the Spaced Repetition System (SRS) learning session.
 class LearnScreen extends HookConsumerWidget {

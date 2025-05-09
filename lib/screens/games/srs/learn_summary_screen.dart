@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:lingua_visual/screens/ads/rewarded_ad_screen.dart';
-import 'package:lingua_visual/services/ad_service.dart';
+import 'package:Languador/screens/ads/rewarded_ad_screen.dart';
+import 'package:Languador/services/ad_service.dart';
 
 /// A screen that shows a summary of the learning session
 /// and displays a rewarded ad for additional cards

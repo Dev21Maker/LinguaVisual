@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lingua_visual/providers/firebase_provider.dart';
-import 'package:lingua_visual/providers/navigator_provider.dart';
-import 'package:lingua_visual/widgets/image_prompt_dialog.dart';
+import 'package:Languador/providers/firebase_provider.dart';
+import 'package:Languador/providers/navigator_provider.dart';
+import 'package:Languador/widgets/image_prompt_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:uuid/uuid.dart';

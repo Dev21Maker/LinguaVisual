@@ -3,9 +3,9 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:flutter_tts/flutter_tts.dart';
-import 'package:lingua_visual/models/flashcard.dart';
+import 'package:Languador/models/flashcard.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:lingua_visual/providers/learn_provider.dart';
+import 'package:Languador/providers/learn_provider.dart';
 
 class FlashcardView extends StatefulWidget {
   final List<Flashcard> flashcards;

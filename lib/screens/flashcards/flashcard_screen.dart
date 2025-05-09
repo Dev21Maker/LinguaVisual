@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:lingua_visual/models/flashcard.dart';
-import 'package:lingua_visual/models/flashcard_stack.dart';
-import 'package:lingua_visual/models/language.dart';
-import 'package:lingua_visual/providers/connectivity_provider.dart';
-import 'package:lingua_visual/providers/flashcard_provider.dart';
-import 'package:lingua_visual/providers/stack_provider.dart';
-import 'package:lingua_visual/widgets/flashcard_tile.dart';
-import 'package:lingua_visual/widgets/flashcards_builder.dart';
+import 'package:Languador/models/flashcard.dart';
+import 'package:Languador/models/flashcard_stack.dart';
+import 'package:Languador/models/language.dart';
+import 'package:Languador/providers/connectivity_provider.dart';
+import 'package:Languador/providers/flashcard_provider.dart';
+import 'package:Languador/providers/stack_provider.dart';
+import 'package:Languador/widgets/flashcard_tile.dart';
+import 'package:Languador/widgets/flashcards_builder.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 

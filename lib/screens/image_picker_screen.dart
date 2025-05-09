@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:lingua_visual/widgets/image_picker_web_view.dart';
+import 'package:Languador/widgets/image_picker_web_view.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 /// A screen that demonstrates the ImagePickerWebView component.

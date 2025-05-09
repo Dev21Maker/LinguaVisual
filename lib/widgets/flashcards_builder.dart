@@ -8,12 +8,18 @@ import 'package:lingua_visual/providers/connectivity_provider.dart';
 import 'package:lingua_visual/providers/offline_flashcard_provider.dart';
 import 'package:lingua_visual/providers/settings_provider.dart';
 import 'package:lingua_visual/providers/flashcard_provider.dart';
+import 'package:lingua_visual/providers/stack_provider.dart';
 import 'package:uuid/uuid.dart';
 
 class FlashCardBuilder extends StatelessWidget {
-  const FlashCardBuilder({required this.ref, super.key, String? stackId});
+  const FlashCardBuilder({
+    required this.ref, 
+    super.key, 
+    this.stackId,
+  });
 
   final WidgetRef ref;
+  final String? stackId;
 
   @override
   Widget build(BuildContext context) {
@@ -38,8 +44,9 @@ class FlashCardBuilder extends StatelessWidget {
               final translation = parts[1].trim();
 
               if (word.isNotEmpty && translation.isNotEmpty) {
+                final id = const Uuid().v4();
                 final newFlashcard = OfflineFlashcard(
-                  id: const Uuid().v4(),
+                  id: id,
                   word: word,
                   targetLanguageCode: targetLanguageState.value.code,
                   translation: translation,
@@ -65,6 +72,11 @@ class FlashCardBuilder extends StatelessWidget {
                     srsNextReviewDate: newFlashcard.srsNextReviewDate,
                   );
                   await ref.read(flashcardStateProvider.notifier).addFlashcard(onlineFlashcard);
+                }
+                
+                // Add to current stack if a stack is selected
+                if (stackId != null) {
+                  await ref.read(stacksProvider.notifier).addFlashcardToStack(stackId!, id);
                 }
               }
             }
@@ -230,8 +242,9 @@ class FlashCardBuilder extends StatelessWidget {
                   if (isBulkMode.value) {
                     await _addBulkFlashcards();
                   } else {
+                    final id = const Uuid().v4();
                     final newFlashcard = OfflineFlashcard(
-                      id: const Uuid().v4(),
+                      id: id,
                       word: wordController.text,
                       targetLanguageCode: targetLanguageState.value.code,
                       translation: translationController.text,
@@ -257,6 +270,11 @@ class FlashCardBuilder extends StatelessWidget {
                         srsNextReviewDate: newFlashcard.srsNextReviewDate,
                       );
                       await ref.read(flashcardStateProvider.notifier).addFlashcard(onlineFlashcard);
+                    }
+                    
+                    // Add to current stack if a stack is selected
+                    if (stackId != null) {
+                      await ref.read(stacksProvider.notifier).addFlashcardToStack(stackId!, id);
                     }
                   }
                   if (context.mounted) {

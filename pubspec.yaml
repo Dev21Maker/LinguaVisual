@@ -30,7 +30,7 @@ dependencies:
   flutter_hooks: ^0.21.2
   connectivity_plus: ^6.1.4
   image_picker: ^1.1.2
-  flutter_launcher_icons: ^0.14.3
+  flutter_native_splash: ^2.4.6
   flutter_tts: ^3.8.5 # Or the latest version
   # multi_language_srs:
   #   git:
@@ -45,6 +45,13 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+
+flutter_native_splash:
+  color: "#000000"
+  image: "assets/logo.png"
+  android_12:
+    color: "#000000"
+    icon_background_color: "#000000"
 
 flutter:
   uses-material-design: true

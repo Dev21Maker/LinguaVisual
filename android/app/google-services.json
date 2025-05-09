@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:325036769782:android:5fc58f1fb87164d74187d7",
+        "mobilesdk_app_id": "1:325036769782:android:aa89f74cb3b608b94187d7",
         "android_client_info": {
-          "package_name": "com.example.lingua_visual"
+          "package_name": "com.iacstudio.languador"
         }
       },
       "oauth_client": [],

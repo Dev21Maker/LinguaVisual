@@ -195,34 +195,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           
           const Divider(),
 
-          // Review Settings Section
-          ListTile(
-            title: Text(
-              l10n.settingsReviewSectionTitle,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Theme.of(context).colorScheme.primary),
-            ),
-          ),
-          SwitchListTile(
-            secondary: const Icon(Icons.notifications),
-            title: Text(l10n.settingsReviewRemindersTile),
-            subtitle: Text(l10n.settingsReviewRemindersSubtitle),
-            value: true, // TODO: Connect to actual state
-            onChanged: (bool value) {
-              // TODO: Implement reminder toggle
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.schedule),
-            title: Text(l10n.settingsReviewLimitTile),
-            subtitle: Text(l10n.settingsReviewLimitSubtitle),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              // TODO: Implement review limit setting
-            },
-          ),
-
-          const Divider(),
-
           // App Settings Section
           ListTile(
             title: Text(

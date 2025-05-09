@@ -19,9 +19,9 @@ class AdService {
   RewardedAd? _rewardedAd;
 
   // Test ad units for development
-  static const String _testBannerAdUnitId = 'ca-app-pub-3940256099942544/6300978111';
+  static const String _testBannerAdUnitId = 'ca-app-pub-9881290136478504/4053762209';
   static const String _testInterstitialAdUnitId = 'ca-app-pub-3940256099942544/1033173712';
-  static const String _testRewardedAdUnitId = 'ca-app-pub-3940256099942544/5224354917';//'ca-app-pub-9881290136478504/3415150725';
+  static const String _testRewardedAdUnitId = 'ca-app-pub-9881290136478504/3415150725';
 
   // Production ad units (replace with actual IDs when available)
   static const String _prodBannerAdUnitId = '';

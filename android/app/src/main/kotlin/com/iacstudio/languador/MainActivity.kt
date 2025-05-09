@@ -1,4 +1,4 @@
-package com.example.lingua_visual
+package com.iacstudio.languador
 
 import io.flutter.embedding.android.FlutterActivity
 

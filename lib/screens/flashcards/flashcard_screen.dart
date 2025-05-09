@@ -85,55 +85,58 @@ class FlashcardScreen extends HookConsumerWidget {
                 .watch(stacksProvider)
                 .when(
                   data: (stacks) {
-                    return Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (currentStackId != null)
-                          ListTile(
-                            leading: const Icon(Icons.remove_circle_outline, color: Colors.red),
-                            title: Text(l10n.flashcardsRemoveFromCurrentStack),
-                            onTap: () {
-                              ref.read(stacksProvider.notifier).removeFlashcardFromStack(currentStackId, card.id);
-                              Navigator.pop(context);
-                            },
-                          ),
-                        if (currentStackId != null) const Divider(),
-                        if (stacks.isEmpty)
-                          Text(l10n.flashcardsNoStacksAvailable)
-                        else
-                          SizedBox(
-                            width: double.maxFinite,
-                            height: 300, // Fixed height for scrollable list
-                            child: ListView.builder(
-                              shrinkWrap: true,
-                              itemCount: stacks.length,
-                              itemBuilder: (context, index) {
-                                final stack = stacks[index];
-                                final isCurrentStack = stack.id == currentStackId;
-                                final isCardInStack = stack.flashcardIds.contains(card.id);
-
-                                return ListTile(
-                                  enabled: !isCurrentStack,
-                                  leading: const Icon(Icons.folder),
-                                  title: Text(stack.name),
-                                  trailing: isCardInStack ? const Icon(Icons.check) : null,
-                                  onTap: () {
-                                    if (isCardInStack) {
-                                      ref.read(stacksProvider.notifier).removeFlashcardFromStack(stack.id, card.id);
-                                    } else {
-                                      ref.read(stacksProvider.notifier).addFlashcardToStack(stack.id, card.id);
-                                    }
-                                    Navigator.pop(context);
-                                  },
-                                );
+                    return SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (currentStackId != null)
+                            ListTile(
+                              leading: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                              title: Text(l10n.flashcardsRemoveFromCurrentStack),
+                              onTap: () {
+                                ref.read(stacksProvider.notifier).removeFlashcardFromStack(currentStackId, card.id);
+                                Navigator.pop(context);
                               },
                             ),
+                          if (currentStackId != null) const Divider(),
+                          if (stacks.isEmpty)
+                            ListTile(
+                              leading: const Icon(Icons.warning, color: Colors.amber),
+                              title: Text(l10n.flashcardsNoStacksAvailable),
+                            )
+                          else
+                            ...stacks
+                                .where((stack) => stack.id != currentStackId)
+                                .map(
+                                  (stack) => ListTile(
+                                    leading: const Icon(Icons.folder),
+                                    title: Text(stack.name),
+                                    subtitle: Text('${stack.flashcardIds.length} cards'),
+                                    onTap: () {
+                                      ref.read(stacksProvider.notifier).addFlashcardToStack(stack.id, card.id);
+                                      Navigator.pop(context);
+                                    },
+                                  ),
+                                )
+                                .toList(),
+                          const Divider(),
+                          ListTile(
+                            leading: const Icon(Icons.language, color: Colors.blue),
+                            title: const Text("Create Stack by Language"),
+                            onTap: () {
+                              Navigator.pop(context);
+                              _createStacksByLanguage(context, ref);
+                            },
                           ),
-                      ],
+                        ],
+                      ),
                     );
                   },
                   loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (error, _) => Text('${l10n.commonError}: $error'),
+                  error:
+                      (error, _) => Center(
+                    child: Text(l10n.stackListErrorLoading, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                  ),
                 ),
             actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text(l10n.commonCancel))],
           ),
@@ -143,6 +146,107 @@ class FlashcardScreen extends HookConsumerWidget {
   Future<void> _updateCardImage(BuildContext context, WidgetRef ref, String cardId, String newImageUrl) async {
     final flashcardProvider = ref.read(flashcardStateProvider.notifier);
     await flashcardProvider.updateCardImage(cardId, newImageUrl);
+  }
+
+  void _createStacksByLanguage(BuildContext context, WidgetRef ref) async {
+    final l10n = AppLocalizations.of(context)!;
+    final flashcardsAsync = ref.watch(flashcardStateProvider);
+    final stacksAsync = ref.watch(stacksProvider);
+    
+    if (flashcardsAsync is AsyncData && stacksAsync is AsyncData) {
+      final flashcards = flashcardsAsync.value;
+      final stacks = stacksAsync.value;
+      
+      // Group flashcards by targetLanguageCode
+      final Map<String, List<String>> languageMap = {};
+      try {
+        for (final card in flashcards!) {
+          if (!languageMap.containsKey(card.targetLanguageCode)) {
+            languageMap[card.targetLanguageCode] = [];
+          }
+          languageMap[card.targetLanguageCode]!.add(card.id);
+        } 
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.flashcardsErrorLoadingFlashcards)),
+        );
+        return;
+      }
+      
+      if (languageMap.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.flashcardsNoFlashcards)),
+        );
+        return;
+      }
+      
+      // Create a stack for each language
+      int stacksCreated = 0;
+      
+      for (final entry in languageMap.entries) {
+        // Get language name from supported languages
+        final language = supportedLanguages.firstWhere(
+          (lang) => lang.code == entry.key,
+          orElse: () => Language(nativeName: entry.key, code: entry.key, name: entry.key, emoji: '📝'),
+        );
+        
+        // Check if a stack with this language name already exists
+        if (stacks == null) {
+          return;
+        }
+        final existingStack = stacks.where((s) => s.name == language.name).toList();
+        
+        if (existingStack.isNotEmpty) {
+          // Stack exists - add cards that aren't already in the stack
+          final stack = existingStack.first;
+          final missingCards = entry.value.where((id) => !stack.flashcardIds.contains(id)).toList();
+          
+          for (final cardId in missingCards) {
+            await ref.read(stacksProvider.notifier).addFlashcardToStack(stack.id, cardId);
+          }
+          
+          if (missingCards.isNotEmpty) {
+            stacksCreated++;
+          }
+        } else {
+          // Create new stack with language name
+          await ref.read(stacksProvider.notifier).createStack(
+            language.name, 
+            "${language.name} ${l10n.flashcardsStackDescriptionLabel}",
+          );
+          
+          // Get the newly created stack
+          final updatedStacks = ref.read(stacksProvider).value ?? [];
+          final newStack = updatedStacks.firstWhere((s) => s.name == language.name);
+          
+          // Add all cards of this language to the stack
+          for (final cardId in entry.value) {
+            await ref.read(stacksProvider.notifier).addFlashcardToStack(newStack.id, cardId);
+          }
+          
+          stacksCreated++;
+        }
+      }
+      
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            stacksCreated > 0 
+                ? "Created $stacksCreated language stacks" 
+                : "Language stacks already exist",
+          ),
+        ),
+      );
+    } else {
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.flashcardsErrorLoadingFlashcards),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    }
   }
 
   @override
@@ -199,7 +303,11 @@ class FlashcardScreen extends HookConsumerWidget {
                 error: (_, __) => Text(l10n.flashcardsAppBarTitle),
               ),
             ),
-            // Add menu button here
+            IconButton(
+              icon: const Icon(Icons.sort),
+              onPressed: () => toggleOrder(),
+              tooltip: l10n.sortLatest,
+            ),
             PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert),
               tooltip: l10n.flashcardsReverseOrderTooltip,
@@ -209,43 +317,41 @@ class FlashcardScreen extends HookConsumerWidget {
                     toggleOrder();
                     break;
                   case 'refresh':
-                    // Discard the result but still call refresh
                     ref.refresh(flashcardStateProvider);
                     ref.refresh(stacksProvider);
                     break;
                 }
               },
               itemBuilder:
-                  (BuildContext context) => <PopupMenuEntry<String>>[
-                    PopupMenuItem<String>(
-                      value: 'toggle_order',
-                      child: Row(
-                        children: [
-                          Icon(
-                            isReversed.value ? Icons.sort_rounded : Icons.sort_by_alpha_rounded,
-                            size: 20,
-                            color: Theme.of(context).iconTheme.color,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(isReversed.value ? l10n.sortOldest : l10n.sortLatest),
-                        ],
+                  (context) => [
+                PopupMenuItem<String>(
+                  value: 'toggle_order',
+                  child: Row(
+                    children: [
+                      Icon(
+                        isReversed.value ? Icons.sort_rounded : Icons.sort_by_alpha_rounded,
+                        size: 20,
+                        color: Theme.of(context).iconTheme.color,
                       ),
-                    ),
-                    PopupMenuItem<String>(
-                      value: 'refresh',
-                      child: Row(
-                        children: [
-                          Icon(Icons.refresh, size: 20, color: Theme.of(context).iconTheme.color),
-                          const SizedBox(width: 8),
-                          Text(l10n.actionRefresh),
-                        ],
-                      ),
-                    ),
-                  ],
+                      const SizedBox(width: 8),
+                      Text(isReversed.value ? l10n.sortOldest : l10n.sortLatest),
+                    ],
+                  ),
+                ),
+                PopupMenuItem<String>(
+                  value: 'refresh',
+                  child: Row(
+                    children: [
+                      Icon(Icons.refresh, size: 20, color: Theme.of(context).iconTheme.color),
+                      const SizedBox(width: 8),
+                      Text(l10n.actionRefresh),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ],
         ),
-        actions: const [], // Remove the original actions
       ),
       drawer: Drawer(
         child: stacksAsync.when(

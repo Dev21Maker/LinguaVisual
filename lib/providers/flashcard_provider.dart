@@ -239,33 +239,42 @@ class FlashcardStateNotifier extends StateNotifier<AsyncValue<List<OnlineFlashca
   }
 
   Future<void> addFlashcard(OnlineFlashcard flashcard) async {
-    // Get current state or default to empty list if loading/error
-    final currentFlashcards = state.value ?? [];
-    // Generate a new ID if one isn't provided or handle as needed
-    final newFlashcard = flashcard.id.isEmpty
-      ? flashcard.copyWith(id: const Uuid().v4())
-      : flashcard;
-    final updatedFlashcards = [...currentFlashcards, newFlashcard];
-
-    // Update state immediately
-    state = AsyncValue.data(updatedFlashcards);
-
-    await _saveOfflineFlashcards(updatedFlashcards);
-
-    try {
-      final firebaseService = ref.read(firebaseServiceProvider);
-      // For now, we assume the locally generated ID is sufficient or Firebase handles updates correctly.
-      await firebaseService.insertCard(newFlashcard);
-      // _checkForMissingImages(); // Check images after adding
-    } catch (e) {
-      // Log Firebase error, but keep local state
-      print('Firebase addFlashcard failed: $e');
-      // Optionally, set a flag indicating sync failure
-      // Revert to error state if Firebase fails? Or keep local state?
-                                       // Let's keep the local state for offline-first
-      state = AsyncValue.data(updatedFlashcards); // Keep local changes
-    }
+  // Get current state or default to empty list if loading/error
+  final currentFlashcards = state.value ?? [];
+  
+  // Check if we've reached the flashcard limit (500)
+  if (currentFlashcards.length >= 500) {
+    // We could throw an exception, show a message, or handle this in the UI
+    // For now, we'll just print a message and return without adding
+    print('Flashcard limit reached (500 cards). Cannot add more cards.');
+    return;
   }
+  
+  // Generate a new ID if one isn't provided or handle as needed
+  final newFlashcard = flashcard.id.isEmpty
+    ? flashcard.copyWith(id: const Uuid().v4())
+    : flashcard;
+  final updatedFlashcards = [...currentFlashcards, newFlashcard];
+
+  // Update state immediately
+  state = AsyncValue.data(updatedFlashcards);
+
+  await _saveOfflineFlashcards(updatedFlashcards);
+
+  try {
+    final firebaseService = ref.read(firebaseServiceProvider);
+    // For now, we assume the locally generated ID is sufficient or Firebase handles updates correctly.
+    await firebaseService.insertCard(newFlashcard);
+    // _checkForMissingImages(); // Check images after adding
+  } catch (e) {
+    // Log Firebase error, but keep local state
+    print('Firebase addFlashcard failed: $e');
+    // Optionally, set a flag indicating sync failure
+    // Revert to error state if Firebase fails? Or keep local state?
+                                     // Let's keep the local state for offline-first
+    state = AsyncValue.data(updatedFlashcards); // Keep local changes
+  }
+}
 
   Future<void> _checkForMissingImages() async {
     // Only proceed if state is AsyncData
@@ -295,6 +304,8 @@ class FlashcardStateNotifier extends StateNotifier<AsyncValue<List<OnlineFlashca
         barrierDismissible: false, // Keep false for now to ensure user interaction
         builder: (dialogContext) => ImagePromptDialog(
           word: card.word,
+          targetLanguage: card.targetLanguage,
+          translation: card.translation,
           onImageSelected: (url) async {
             // 1. Update card in Firebase
             final updatedCard = card.copyWith(imageUrl: url);

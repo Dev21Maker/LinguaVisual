@@ -179,7 +179,7 @@ class FlashCardBuilder extends StatelessWidget {
                         children: [
                           const Text(
                             'How to add multiple words:',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.black),
                           ),
                           const SizedBox(height: 8),
                           Text(

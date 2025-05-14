@@ -180,6 +180,7 @@ class MyApp extends HookConsumerWidget {
     }, const []);
 
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       navigatorKey: navigatorKey,
       title: 'LinguaVisual',
       theme: _buildTheme(const AppTheme(isDark: false)),

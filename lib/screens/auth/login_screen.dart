@@ -112,6 +112,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       const SizedBox(height: 50),
                       TextFormField(
                         controller: _emailController,
+                        style: const TextStyle(color: Colors.black), // Added this line
                         decoration: InputDecoration(
                           hintText: "Email", 
                           hintStyle: TextStyle(color: Colors.grey[700]),
@@ -138,6 +139,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       const SizedBox(height: 20),
                       TextFormField(
                         controller: _passwordController,
+                        style: const TextStyle(color: Colors.black), // Added this line
                         decoration: InputDecoration(
                           hintText: "Password", 
                           hintStyle: TextStyle(color: Colors.grey[700]),

@@ -298,11 +298,11 @@ class LearnProvider extends StateNotifier<AsyncValue<void>> {
                 ),
                 textAlign: TextAlign.center,
               ),
-              if (flashcard.description.isNotEmpty)
+              if (flashcard.description != null && flashcard.description!.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(
-                    flashcard.description,
+                    flashcard.description!,
                     style: const TextStyle(
                       fontSize: 16,
                       color: Colors.white70,

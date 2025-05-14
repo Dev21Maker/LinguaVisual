@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -16,14 +18,35 @@ class FlashcardScreen extends HookConsumerWidget {
   const FlashcardScreen({super.key});
 
   void _showAddFlashcardDialog(BuildContext context, WidgetRef ref, String? stackId) {
-    showDialog(
-      context: context,
-      builder:
-          (context) => FlashCardBuilder(
-            ref: ref,
-            stackId: stackId, // Pass the current stack ID
-          ),
-    );
+    final flashcardsAsync = ref.read(flashcardStateProvider);
+    final l10n = AppLocalizations.of(context)!;
+    
+    // Check if we've reached the flashcard limit
+    if (flashcardsAsync.value != null && flashcardsAsync.value!.length >= 500) {
+      // Show a dialog informing the user they've reached the limit
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(l10n.dialogDeleteTitle),
+          content: const Text('You have reached the maximum limit of 500 flashcards. Please delete some flashcards before adding new ones.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(l10n.commonCancel),
+            ),
+          ],
+        ),
+      );
+    } else {
+      // Show the flashcard builder dialog if under the limit
+      showDialog(
+        context: context,
+        builder: (context) => FlashCardBuilder(
+          ref: ref,
+          stackId: stackId, // Pass the current stack ID
+        ),
+      );
+    }
   }
 
   void _showCreateStackDialog(BuildContext context, WidgetRef ref) {
@@ -144,8 +167,29 @@ class FlashcardScreen extends HookConsumerWidget {
   }
 
   Future<void> _updateCardImage(BuildContext context, WidgetRef ref, String cardId, String newImageUrl) async {
-    final flashcardProvider = ref.read(flashcardStateProvider.notifier);
-    await flashcardProvider.updateCardImage(cardId, newImageUrl);
+    ref.read(flashcardStateProvider.notifier).updateCardImage(cardId, newImageUrl);
+  }
+
+  void _deleteFlashcard(BuildContext context, WidgetRef ref, String cardId) {
+    // Call the removeFlashcard method from the flashcard provider
+    ref.read(flashcardStateProvider.notifier).removeFlashcard(cardId);
+    
+    // Show a snackbar to confirm deletion
+    final l10n = AppLocalizations.of(context)!;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${l10n.dialogDeleteTitle} successful'),
+        action: SnackBarAction(
+          label: l10n.commonRetry,
+          onPressed: () {
+            // Undo functionality could be implemented here
+            // This would require storing the deleted flashcard temporarily
+            // and re-adding it if the user taps 'Retry'
+          },
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
   }
 
   void _createStacksByLanguage(BuildContext context, WidgetRef ref) async {
@@ -303,6 +347,38 @@ class FlashcardScreen extends HookConsumerWidget {
                 error: (_, __) => Text(l10n.flashcardsAppBarTitle),
               ),
             ),
+            // Flashcard limit indicator
+            flashcardsAsync.when(
+              data: (flashcards) {
+                final count = flashcards.length;
+                final percentage = (count / 500) * 100;
+                final color = percentage > 90 ? Colors.red : 
+                             percentage > 70 ? Colors.orange : 
+                             Colors.green;
+                return Tooltip(
+                  message: '$count of 500 flashcards used',
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: color, width: 1),
+                    ),
+                    child: Text(
+                      '$count/500',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: color,
+                      ),
+                    ),
+                  ),
+                );
+              },
+              loading: () => const SizedBox(),
+              error: (_, __) => const SizedBox(),
+            ),
+            const SizedBox(width: 8),
             IconButton(
               icon: const Icon(Icons.sort),
               onPressed: () => toggleOrder(),
@@ -484,25 +560,51 @@ class FlashcardScreen extends HookConsumerWidget {
             );
           }
 
-          return ListView.builder(
-            itemCount: displayedFlashcards.length,
-            itemBuilder: (context, index) {
-              final card = displayedFlashcards[index];
-              return FlashcardTile(
-                card: card,
-                translationVisible: translationVisible,
-                changeTranslationVisibility: (p0) => changeTranslationVisibility(p0),
-                showMoveToStackDialog: () => _showMoveToStackDialog(context, ref, card, selectedStackId.value),
-                getEmoji: () {
-                  if (ref.read(isOnlineProvider.notifier).state) {
-                    return card.targetLanguage.emoji;
-                  } else {
-                    return supportedLanguages.firstWhere((element) => element.code == card.targetLanguageCode).emoji;
-                  }
-                },
-                onImageUpdated: (cardId, imageUrl) => _updateCardImage(context, ref, cardId, imageUrl),
-              );
-            },
+          // Get screen width to determine padding
+          final screenWidth = MediaQuery.of(context).size.width;
+          
+          // Calculate adaptive padding based on screen size
+          // For smaller screens, keep minimal padding
+          // For larger screens, increase padding proportionally
+          final horizontalPadding = screenWidth > 600 
+              ? max(16.0, (screenWidth - 600) / 2) 
+              : 0.0;
+          
+          return Padding(
+            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                // Limit maximum width for better readability on very large screens
+                final maxContentWidth = min(constraints.maxWidth, 800.0);
+                
+                return Center(
+                  child: SizedBox(
+                    width: maxContentWidth,
+                    child: ListView.builder(
+                      itemCount: displayedFlashcards.length,
+                      itemBuilder: (context, index) {
+                        final card = displayedFlashcards[index];
+                        return FlashcardTile(
+                          card: card,
+                          translationVisible: translationVisible,
+                          changeTranslationVisibility: (p0) => changeTranslationVisibility(p0),
+                          showMoveToStackDialog: () => _showMoveToStackDialog(context, ref, card, selectedStackId.value),
+                          getEmoji: () {
+                            if (ref.read(isOnlineProvider.notifier).state) {
+                              return card.targetLanguage.emoji;
+                            } else {
+                              return supportedLanguages.firstWhere((element) => element.code == card.targetLanguageCode).emoji;
+                            }
+                          },
+                          onImageUpdated: (cardId, imageUrl) => _updateCardImage(context, ref, cardId, imageUrl),
+                          onDeleteCard: (cardId) => _deleteFlashcard(context, ref, cardId),
+                        );
+                      },
+                    ),
+                  ),
+                );
+              },
+            ),
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),

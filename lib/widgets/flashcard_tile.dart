@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:Languador/models/online_flashcard.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:Languador/models/flashcard.dart';
@@ -15,6 +16,7 @@ class FlashcardTile<T extends Flashcard> extends ConsumerStatefulWidget {
     required this.showMoveToStackDialog,
     required this.getEmoji,
     required this.onImageUpdated,
+    required this.onDeleteCard,
     super.key,
   });
 
@@ -24,6 +26,7 @@ class FlashcardTile<T extends Flashcard> extends ConsumerStatefulWidget {
   final VoidCallback showMoveToStackDialog;
   final String Function() getEmoji;
   final Function(String, String) onImageUpdated;
+  final Function(String) onDeleteCard;
 
   @override
   ConsumerState<FlashcardTile<T>> createState() => _FlashcardTileState<T>();
@@ -37,6 +40,8 @@ class _FlashcardTileState<T extends Flashcard> extends ConsumerState<FlashcardTi
       builder:
           (context) => ImagePromptDialog(
             word: widget.card.word.toString(),
+            translation: widget.card.translation,
+            targetLanguage: (widget.card as OnlineFlashcard).targetLanguage,
             onImageSelected: (url) {
               Navigator.pop(context, url);
             },
@@ -47,6 +52,33 @@ class _FlashcardTileState<T extends Flashcard> extends ConsumerState<FlashcardTi
 
     if (imageUrl != null && mounted) {
       widget.onImageUpdated(widget.card.id, imageUrl);
+    }
+  }
+
+  Future<void> _showDeleteConfirmation(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Flashcard'),
+        content: const Text('Are you sure you want to delete this flashcard? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      widget.onDeleteCard(widget.card.id);
     }
   }
 
@@ -84,6 +116,11 @@ class _FlashcardTileState<T extends Flashcard> extends ConsumerState<FlashcardTi
                             icon: const Icon(Icons.folder_shared),
                             onPressed: () => widget.showMoveToStackDialog.call(),
                             tooltip: 'Move to stack',
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, color: Colors.red),
+                            onPressed: () => _showDeleteConfirmation(context),
+                            tooltip: 'Delete flashcard',
                           ),
                           const SizedBox(width: 16),
                         ],

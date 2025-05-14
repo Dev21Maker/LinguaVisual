@@ -13,6 +13,7 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:Languador/providers/ad_provider.dart';
 import 'package:Languador/widgets/banner_ad_widget.dart';
 import 'package:Languador/screens/games/srs/learn_summary_screen.dart';
+import 'package:Languador/providers/flashcard_hint_provider.dart';
 
 // LearnScreen Widget: Manages the Spaced Repetition System (SRS) learning session.
 class LearnScreen extends HookConsumerWidget {
@@ -402,6 +403,11 @@ class LearnScreen extends HookConsumerWidget {
 
       // Display the FlashcardView widget with the due flashcards.
       // The key ensures the widget rebuilds when the first card changes.
+      // Clear any generated sentences when returning to the learn screen to ensure fresh ones are generated
+      if (dueFlashcards.isNotEmpty) {
+        ref.read(flashcardSentenceProvider.notifier).clearAllSentences();
+      }
+      
       return FlashcardView(
         key: ValueKey(dueFlashcards.isNotEmpty ? dueFlashcards[0].id : 'empty'),
         flashcards: dueFlashcards,

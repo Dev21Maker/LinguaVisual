@@ -1,7 +1,9 @@
+import 'package:Languador/screens/auth/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'dart:async';
 import 'package:Languador/models/language.dart';
 import 'package:Languador/providers/auth_provider.dart' as auth_prov;
 import 'package:Languador/providers/flashcard_provider.dart';
@@ -17,6 +19,9 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  // Controller for the delete account functionality
+  double _holdProgress = 0.0;
+  Timer? _holdTimer;
   void _showLanguageSelector({
     required BuildContext context,
     required bool isNativeLanguage,
@@ -302,10 +307,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                     TextButton(
                       onPressed: () async {
-                        Navigator.pop(context); // Close dialog
+                        // Close dialog first
+                        Navigator.pop(context);
+                        
+                        // Get auth service and sign out
                         final authService = ref.read(auth_prov.authServiceProvider);
                         await authService.signOut(force: true);
-                        // No navigation needed - StreamBuilder will handle it
+                        
+                        // Ensure we clear the navigation stack
+                        if (mounted) {
+                          // Pop all routes until we're at the root, then let the StreamBuilder handle redirection
+                          Navigator.of(context).popUntil((route) => route.isFirst);
+                        }
                       },
                       child: Text(l10n.settingsLogoutConfirmButton, style: const TextStyle(color: Colors.red)),
                     ),
@@ -315,9 +328,239 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             },
           ),
 
+          // Delete Account Option
+          ListTile(
+            leading: const Icon(Icons.delete_forever, color: Colors.red),
+            title: const Text('Delete Account'),  // Use l10n.settingsDeleteAccountTitle when added to localizations
+            subtitle: const Text('Permanently delete your account and all data'), // Use l10n.settingsDeleteAccountSubtitle when added to localizations
+            onTap: () {
+              _showDeleteAccountDialog(context);
+            },
+          ),
+
           const SizedBox(height: 16), // Bottom padding
         ],
       ),
     );
+  }
+  
+  // Method to show delete account dialog with direct hold-to-confirm functionality
+  void _showDeleteAccountDialog(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    _holdProgress = 0.0;
+    _holdTimer?.cancel();
+    _holdTimer = null;
+    
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Delete Account'),  // Use l10n.settingsDeleteAccountDialogTitle when added
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'This action cannot be undone. All your data will be permanently deleted.',
+                      // Use l10n.settingsDeleteAccountDialogContent when added
+                    ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Press and hold the button below for 5 seconds to confirm deletion',
+                      // Use l10n.settingsDeleteAccountHoldInstructions when added
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: MediaQuery.of(context).size.width * 0.8,
+                      child: GestureDetector(
+                        onLongPressStart: (_) {
+                          // Start the timer when user holds down
+                          _holdTimer?.cancel();
+                          _holdTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+                            setState(() {
+                              _holdProgress += 0.02;  // Increment by 2% every 100ms (5 seconds total)
+                              if (_holdProgress >= 1.0) {
+                                _holdTimer?.cancel();
+                                _holdTimer = null;
+                                // Proceed with account deletion when progress is complete
+                                _deleteAccount(context);
+                              }
+                            });
+                          });
+                        },
+                        onLongPressEnd: (_) {
+                          // Cancel the timer if user releases early
+                          _holdTimer?.cancel();
+                          _holdTimer = null;
+                          setState(() {
+                            _holdProgress = 0.0;
+                          });
+                        },
+                        child: Container(
+                          height: 60,
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Stack(
+                            children: [
+                              // Progress indicator
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: FractionallySizedBox(
+                                    widthFactor: _holdProgress,
+                                    heightFactor: 1.0,
+                                    child: Container(
+                                      color: Colors.redAccent,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // Button text
+                              Center(
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.delete_forever, 
+                                      color: Colors.white,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Text(
+                                      'Hold to Delete Account',
+                                      // Use l10n.settingsDeleteAccountHoldButton when added
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    _holdTimer?.cancel();
+                    Navigator.of(context).pop();
+                  },
+                  child: Text(l10n.commonCancel),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+  
+  // Method to handle the actual account deletion
+  void _deleteAccount(BuildContext dialogContext) async {
+    // Close the confirmation dialog
+    if (mounted) {
+      Navigator.of(dialogContext).pop();
+    }
+    
+    // Show a loading overlay
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return const Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: Center(
+            child: CircularProgressIndicator(),
+          ),
+        );
+      },
+    );
+    
+    try {
+      // Get the auth service
+      final authService = ref.read(auth_prov.authServiceProvider);
+      
+      // Delete the user account
+      await authService.deleteAccount();
+      
+      // If we get here, deletion was successful
+      if (mounted) {
+        // Dismiss the loading overlay
+        Navigator.of(context).pop();
+        
+        // Show success message before navigating
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              backgroundColor: Colors.green,
+              title: const Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white),
+                  SizedBox(width: 10),
+                  Text('Success', style: TextStyle(color: Colors.white)),
+                ],
+              ),
+              content: const Text(
+                'Account deleted successfully',
+                style: TextStyle(color: Colors.white),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    // Navigate to login screen when OK is pressed
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (context) => const LoginScreen()),
+                      (route) => false, // Remove all previous routes
+                    );
+                  },
+                  child: const Text('OK', style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            );
+          },
+        );
+      }
+    } catch (e) {
+      // Log the error
+      print('Error during account deletion: $e');
+      
+      if (mounted) {
+        // Dismiss the loading overlay
+        Navigator.of(context).pop();
+        
+        // Show error dialog
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('Error'),
+              content: Text('Failed to delete account: ${e.toString()}'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('OK'),
+                ),
+              ],
+            );
+          },
+        );
+      }
+    }
   }
 }

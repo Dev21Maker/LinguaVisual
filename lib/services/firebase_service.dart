@@ -60,6 +60,54 @@ class FirebaseService {
   bool get isAuthenticated => _auth.currentUser != null;
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
+  // Delete user account and associated data
+  Future<void> deleteAccount() async {
+    if (currentUser == null) throw Exception('User not authenticated');
+    
+    // First, delete all user data from Firestore
+    await _deleteAllUserData();
+    
+    try {
+      // Delete the user account
+      await currentUser!.delete();
+    } finally {
+      // Always sign out, even if deletion fails
+      // This ensures we don't have an invalid auth state
+      await signOut();
+    }
+  }
+  
+  // Helper method to delete all user data from Firestore
+  Future<void> _deleteAllUserData() async {
+    if (currentUser == null) return;
+    
+    // Delete all cards
+    final cardsRef = _firestore
+        .collection('users')
+        .doc(currentUser!.uid)
+        .collection('cards');
+    
+    final cardsSnapshot = await cardsRef.get();
+    for (var doc in cardsSnapshot.docs) {
+      await doc.reference.delete();
+    }
+    
+    // Delete all stacks
+    final stacksRef = _firestore
+        .collection('users')
+        .doc(currentUser!.uid)
+        .collection('stacks');
+    
+    final stacksSnapshot = await stacksRef.get();
+    for (var doc in stacksSnapshot.docs) {
+      await doc.reference.delete();
+    }
+    
+    // Finally, delete the user document itself
+    await _firestore.collection('users').doc(currentUser!.uid).delete();
+    // Note: We don't delete the Firebase Auth user here - that's handled in the deleteAccount method
+  }
+
   // User profile (metadata)
   Future<void> updateUserMetadata(Map<String, dynamic> metadata) async {
     if (_auth.currentUser != null) {

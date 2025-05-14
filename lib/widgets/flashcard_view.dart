@@ -4,8 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:Languador/models/flashcard.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:Languador/providers/learn_provider.dart';
+import 'package:Languador/providers/flashcard_hint_provider.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class FlashcardView extends StatefulWidget {
   final List<Flashcard> flashcards;
@@ -474,11 +475,11 @@ class _FlashcardBuildItemViewState
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  if (flashcard.description.isNotEmpty)
+                  if (flashcard.hint != null && flashcard.hint!.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: Text(
-                        flashcard.description,
+                        flashcard.hint!,
                         style: const TextStyle(
                           fontSize: 16,
                           color: Colors.white70,
@@ -627,12 +628,100 @@ class FrontSideWidget extends StatefulWidget {
 }
 
 class _FrontSideWidgetState extends State<FrontSideWidget> {
+  // Controller for the description input field
+  final TextEditingController _descriptionController = TextEditingController();
+  // State for tracking whether to show the input field
+  bool _showDescriptionInput = false;
+  // State for storing generated sentences
+  String? _generatedSentence;
+  bool _isLoadingSentence = false;
 
   @override
   void initState() {
-    // TODO: implement initState
     super.initState();
     widget.onSpeakPressed(widget.flashcard.word);
+    // Initialize description input or load sentence
+    _initializeDescriptionOrSentence();
+  }
+  
+  @override
+  void dispose() {
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  // Initialize based on whether description exists
+  Future<void> _initializeDescriptionOrSentence() async {
+    setState(() {
+      // If description is null, show the input field
+      _showDescriptionInput = widget.flashcard.description == null;
+    });
+    
+    // If description exists, load a generated sentence
+    if (widget.flashcard.description != null) {
+      _loadGeneratedSentence();
+    }
+  }
+  
+  // Load a generated sentence for flashcards with descriptions
+  Future<void> _loadGeneratedSentence() async {
+    if (widget.flashcard.description == null) return;
+    
+    setState(() {
+      _isLoadingSentence = true;
+    });
+    
+    try {
+      // Get the provider using ProviderScope
+      final sentenceProvider = ProviderScope.containerOf(context).read(flashcardSentenceProvider.notifier);
+      
+      // Get generated sentence for this flashcard
+      final sentence = await sentenceProvider.getSentenceForFlashcard(widget.flashcard);
+      
+      if (mounted) {
+        setState(() {
+          _generatedSentence = sentence;
+          _isLoadingSentence = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading sentence: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingSentence = false;
+        });
+      }
+    }
+  }
+  
+  // Save the user's description for the flashcard
+  Future<void> _saveDescription() async {
+    if (_descriptionController.text.trim().isEmpty) return;
+    
+    final description = _descriptionController.text.trim();
+    
+    try {
+      // Get the provider
+      final sentenceProvider = ProviderScope.containerOf(context).read(flashcardSentenceProvider.notifier);
+      
+      // Update the flashcard description
+      final success = await sentenceProvider.updateFlashcardDescription(
+        widget.flashcard, 
+        description
+      );
+      
+      if (success && mounted) {
+        // Hide input and show generated sentence
+        setState(() {
+          _showDescriptionInput = false;
+        });
+        
+        // Load the generated sentence
+        _loadGeneratedSentence();
+      }
+    } catch (e) {
+      debugPrint('Error saving description: $e');
+    }
   }
 
 
@@ -658,6 +747,83 @@ class _FrontSideWidgetState extends State<FrontSideWidget> {
             onPressed: () => widget.onSpeakPressed.call(widget.flashcard.word),
             tooltip: 'Listen to pronunciation',
           ),
+          // Handle description input or show generated sentence
+          if (_showDescriptionInput) ...[  
+            const SizedBox(height: 20),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.4),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white38),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'What does "${widget.flashcard.word}" mean to you? What\'s your memory/habit or connection to it?',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.white,
+                      fontStyle: FontStyle.italic,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _descriptionController,
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.9),
+                      hintText: 'Enter your description...',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    style: const TextStyle(color: Colors.black87),
+                    maxLines: 3,
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    onPressed: _saveDescription,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text('Save', style: TextStyle(fontSize: 16)),
+                  ),
+                ],
+              ),
+            ),
+          ] else if (_generatedSentence != null) ...[  
+            const SizedBox(height: 20),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.4),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white24),
+              ),
+              child: _isLoadingSentence
+                ? const Center(child: CircularProgressIndicator())
+                : Text(
+                  _generatedSentence!,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Colors.white,
+                    fontStyle: FontStyle.italic,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+            ),
+          ],
           if (widget.isReversedMode)
             Column(
               children: [

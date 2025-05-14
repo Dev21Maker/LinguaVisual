@@ -28,12 +28,14 @@ class OfflineFlashcard extends Flashcard {
     this.srsIsPriority = false,
     this.srsIsInLearningPhase = true,
     this.srsBoxValue,
-    String description = '',
+    String? description,
+    String? hint,
   }) : super(
           srsInterval: srsInterval,
           srsEaseFactor: srsEaseFactor,
           srsNextReviewDate: srsNextReviewDate,
           description: description,
+          hint: hint,
           srsLastReviewDate: srsLastReviewDate,
           srsBaseIntervalIndex: srsBaseIntervalIndex,
           srsQuickStreak: srsQuickStreak,
@@ -61,6 +63,7 @@ class OfflineFlashcard extends Flashcard {
       srsIsInLearningPhase: (map['srs_is_in_learning_phase'] as int? ?? 1) == 1,
       srsBoxValue: map['srs_box_value'] as int?,
       description: map['description'] as String? ?? '',
+      hint: map['hint'] as String?,
     );
   }
 
@@ -83,6 +86,7 @@ class OfflineFlashcard extends Flashcard {
       'srs_is_in_learning_phase': srsIsInLearningPhase ? 1 : 0,
       'srs_box_value': srsBoxValue,
       'description': description,
+      'hint': hint,
     };
   }
 
@@ -101,6 +105,7 @@ class OfflineFlashcard extends Flashcard {
     DateTime? createdAt,
     DateTime? updatedAt,
     String? description,
+    String? hint,
     int? srsBaseIntervalIndex,
     int? srsQuickStreak,
     bool? srsIsPriority,
@@ -120,6 +125,7 @@ class OfflineFlashcard extends Flashcard {
       srsNextReviewDate: srsNextReviewDate ?? this.srsNextReviewDate,
       srsLastReviewDate: srsLastReviewDate ?? this.srsLastReviewDate,
       description: description ?? this.description,
+      hint: hint ?? this.hint,
       srsBaseIntervalIndex: srsBaseIntervalIndex ?? this.srsBaseIntervalIndex,
       srsQuickStreak: srsQuickStreak ?? this.srsQuickStreak,
       srsIsPriority: srsIsPriority ?? this.srsIsPriority,

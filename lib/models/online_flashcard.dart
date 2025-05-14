@@ -40,7 +40,8 @@ class OnlineFlashcard extends Flashcard {
     this.srsIsPriority = false,
     this.srsIsInLearningPhase = true,
     this.srsBoxValue,
-    String description = '',
+    String? description,
+    String? hint,
   }) : super(
           id: id,
           word: word,
@@ -54,6 +55,7 @@ class OnlineFlashcard extends Flashcard {
           srsEaseFactor: srsEaseFactor,
           srsNextReviewDate: srsNextReviewDate,
           description: description, 
+          hint: hint,
           srsLastReviewDate: srsLastReviewDate,
           srsBaseIntervalIndex: srsBaseIntervalIndex,
           srsQuickStreak: srsQuickStreak,
@@ -78,6 +80,7 @@ class OnlineFlashcard extends Flashcard {
     DateTime? updatedAt,
     List<String>? stackIds,
     String? description,
+    String? hint,
     // Add new fields to copyWith
     int? srsBaseIntervalIndex,
     int? srsQuickStreak,
@@ -101,6 +104,7 @@ class OnlineFlashcard extends Flashcard {
       updatedAt: updatedAt ?? this.updatedAt,
       stackIds: stackIds ?? this.stackIds,
       description: description ?? this.description,
+      hint: hint ?? this.hint,
       // Use new fields in copyWith
       srsBaseIntervalIndex: srsBaseIntervalIndex ?? this.srsBaseIntervalIndex,
       srsQuickStreak: srsQuickStreak ?? this.srsQuickStreak,
@@ -128,6 +132,7 @@ class OnlineFlashcard extends Flashcard {
       'updated_at': now.toIso8601String(),
       'stack_ids': stackIds,
       'description': description, 
+      'hint': hint,
       // Add new fields to map
       'srs_base_interval_index': srsBaseIntervalIndex,
       'srs_quick_streak': srsQuickStreak,
@@ -209,6 +214,7 @@ class OnlineFlashcard extends Flashcard {
       updatedAt: parseDateTime(map['updated_at']),
       stackIds: List<String>.from(map['stack_ids'] ?? []),
       description: map['description'] as String? ?? '', 
+      hint: map['hint'] as String?,
       // Read new fields from map with defaults, using parseInt for ints
       srsBaseIntervalIndex: parseInt(map['srs_base_interval_index']), 
       srsQuickStreak: parseInt(map['srs_quick_streak']), 

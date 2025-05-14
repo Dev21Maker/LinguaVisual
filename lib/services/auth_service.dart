@@ -134,4 +134,51 @@ class AuthService {
   Future<void> updateUserMetadata(Map<String, dynamic> metadata) async {
     await _firebase.updateUserMetadata(metadata);
   }
+  
+  // Delete user account and all associated data
+  Future<void> deleteAccount() async {
+    try {
+      // Store the current userId *before* deletion for cleanup
+      final currentUserId = currentUser?.uid;
+      
+      // First clear local data
+      if (currentUserId != null) {
+        await _ref.read(flashcardStateProvider.notifier).clearOfflineFlashcardData();
+        await _ref.read(stacksProvider.notifier).clearOfflineStackData();
+      }
+      
+      // Ensure keep logged in is set to false before deletion
+      await setKeepLoggedIn(false);
+      
+      // Clear any remaining local preferences related to the user
+      final prefs = await SharedPreferences.getInstance();
+      const key = 'loggedInUserIds';
+      final List<String> userIds = prefs.getStringList(key) ?? [];
+      if (currentUserId != null && userIds.contains(currentUserId)) {
+        userIds.remove(currentUserId);
+        await prefs.setStringList(key, userIds);
+      }
+      
+      // Then proceed with account deletion - this will delete all Firestore data
+      // and sign out the user automatically
+      await _firebase.deleteAccount();
+      
+      // Note: We don't need to explicitly call signOut here because:
+      // 1. The FirebaseService.deleteAccount method already calls signOut
+      // 2. Firebase will automatically sign out when the user is deleted
+      
+    } catch (e) {
+      // If there's an error during deletion, attempt to sign out anyway
+      // to ensure we don't have an invalid auth state
+      try {
+        await signOut(force: true);
+      } catch (signOutError) {
+        print('Error during forced sign out after deletion failure: $signOutError');
+      }
+      
+      // Propagate the original error so the UI can handle it
+      print('Error during account deletion: $e');
+      rethrow;
+    }
+  }
 }

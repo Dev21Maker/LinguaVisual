@@ -9,7 +9,8 @@ abstract class Flashcard {
   final int srsNextReviewDate; 
   final double srsInterval; 
   final double srsEaseFactor; 
-  final String description;
+  final String? description;
+  final String? hint;
 
   final int? srsLastReviewDate; 
   final int srsBaseIntervalIndex;
@@ -29,7 +30,8 @@ abstract class Flashcard {
     required this.srsNextReviewDate, 
     this.srsInterval = 0.0, 
     this.srsEaseFactor = 1.0, 
-    this.description = '',
+    this.description,
+    this.hint,
     this.srsLastReviewDate,
     this.srsBaseIntervalIndex = 0,
     this.srsQuickStreak = 0,

@@ -9,8 +9,12 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_svg/flutter_svg.dart'; // Added this import
 
 class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({
+    super.key,
+    this.showDeleteDialog = false,  
+  });
 
+  final bool showDeleteDialog;
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
@@ -22,6 +26,51 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _isLoading = false;
   bool _keepSignedIn = true; // RE-ADD state for checkbox
   final _keepSignedInService = KeepSignedInService(); // RE-ADD service instance
+
+  @override
+  void initState() {
+    super.initState();
+    
+    // Show success message after the first frame is rendered
+    if (widget.showDeleteDialog) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showSuccessDialog();
+      });
+    }
+  }
+  
+  // Show a success dialog instead of a snackbar for better visibility
+  void _showSuccessDialog() {
+    if (!mounted) return;
+    
+    // Show a success banner at the top of the screen
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.green,
+          title: const Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.white),
+              SizedBox(width: 10),
+              Text('Success', style: TextStyle(color: Colors.white)),
+            ],
+          ),
+          content: const Text(
+            'Account deleted successfully',
+            style: TextStyle(color: Colors.white),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   void dispose() {
@@ -74,7 +123,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-
     return Scaffold(
       body: Stack(
         children: [

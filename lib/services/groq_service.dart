@@ -16,6 +16,61 @@ class GroqService {
             },
           ),
         );
+        
+  // Generate a sentence for a flashcard word that's grammatically correct
+  Future<String> generateSentence(String word, String targetLanguageCode) async {
+    try {
+      final apiKey = dotenv.env['GROQ_API_KEY'];
+      if (apiKey == null || apiKey.isEmpty) {
+        print('GROQ_API_KEY is not set in the .env file.');
+        return "Fill in the blank: ____"; // Default fallback
+      }
+
+      // Construct prompt for sentence generation
+      final String prompt = '''
+      Create a single, simple example sentence in $targetLanguageCode using the word "$word".
+      The sentence should be grammatically correct and illustrate the word's usage naturally.
+      Make the sentence easy to understand for language learners.
+      Return only the sentence, nothing else.
+      ''';
+
+      Response response = await _dio.post(
+        "/chat/completions",
+        data: {
+          "model": _model,
+          "messages": [
+            {"role": "system", "content": "You are a helpful language tutor that creates example sentences."},
+            {"role": "user", "content": prompt}
+          ],
+          "temperature": 0.7,
+          "max_tokens": 100,
+        },
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $apiKey',
+            'Content-Type': 'application/json',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 && 
+          response.data != null && 
+          response.data['choices'] != null && 
+          response.data['choices'].isNotEmpty &&
+          response.data['choices'][0]['message'] != null &&
+          response.data['choices'][0]['message']['content'] != null) {
+        
+        final String content = response.data['choices'][0]['message']['content'].trim();
+        return content;
+      } else {
+        print('Invalid response format: ${response.data}');
+        return "Example: $word"; // Simple fallback
+      }
+    } catch (e) {
+      print('Sentence Generation Error: $e');
+      return "Example: $word"; // Simple fallback on error
+    }
+  }
 
   // Improve user query using Groq LLM API
   Future<List<String>> improveQuery(String userInput, String targetLanguage) async {

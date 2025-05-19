@@ -5,7 +5,7 @@ import '../../models/flashcard_stack.dart';
 import '../../providers/flashcard_provider.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
-class StackDetailScreen extends ConsumerWidget {
+class StackDetailScreen extends ConsumerStatefulWidget {
   final FlashcardStack stack;
 
   const StackDetailScreen({
@@ -14,13 +14,31 @@ class StackDetailScreen extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<StackDetailScreen> createState() => _StackDetailScreenState();
+}
+
+class _StackDetailScreenState extends ConsumerState<StackDetailScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Initialize any state or fetch data when the screen is first created
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    // You can add any asynchronous initialization here
+    // For example, pre-loading data or analytics
+    debugPrint('StackDetailScreen initialized for stack: ${widget.stack.id}');
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final flashcardsAsync = ref.watch(flashcardsProvider);
     final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(stack.name),
+        title: Text(widget.stack.name),
         actions: [
           IconButton(
             icon: const Icon(Icons.play_arrow),
@@ -34,7 +52,7 @@ class StackDetailScreen extends ConsumerWidget {
       body: flashcardsAsync.when(
         data: (allFlashcards) {
           final stackFlashcards = allFlashcards
-              .where((card) => stack.flashcardIds.contains(card.id))
+              .where((card) => widget.stack.flashcardIds.contains(card.id))
               .toList();
 
           if (stackFlashcards.isEmpty) {
@@ -72,7 +90,7 @@ class StackDetailScreen extends ConsumerWidget {
                     tooltip: l10n.stackDetailRemoveCardTooltip,
                     onPressed: () {
                       ref.read(stacksProvider.notifier).removeFlashcardFromStack(
-                        stack.id,
+                        widget.stack.id,
                         flashcard.id,
                       );
                     },

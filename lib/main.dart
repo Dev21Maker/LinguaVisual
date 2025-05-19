@@ -1,3 +1,5 @@
+import 'package:Languador/screens/home_screen.dart';
+import 'package:Languador/screens/router.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,7 +9,6 @@ import 'package:Languador/providers/connectivity_provider.dart';
 import 'package:Languador/providers/locale_provider.dart';
 import 'package:Languador/providers/navigator_provider.dart';
 import 'package:Languador/providers/tab_index_provider.dart';
-import 'package:Languador/screens/games/games_view.dart';
 import 'package:Languador/screens/games/srs/learn_screen.dart';
 import 'package:Languador/screens/settings/settings_screen.dart';
 import 'package:Languador/screens/flashcards/flashcard_screen.dart';
@@ -181,8 +182,10 @@ class MyApp extends HookConsumerWidget {
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      // routerConfig: router,
+      // routerDelegate: router.routerDelegate,
       navigatorKey: navigatorKey,
-      title: 'LinguaVisual',
+      title: 'Languador',
       theme: _buildTheme(const AppTheme(isDark: false)),
       darkTheme: _buildTheme(const AppTheme(isDark: true)),
       themeMode: themeMode,
@@ -197,27 +200,40 @@ class MyApp extends HookConsumerWidget {
         Locale('en'), // English
         Locale('pl'), // Polish
       ],
-      home: Consumer(
-        builder: (context, ref, child) {
-          final isOnline = ref.watch(isOnlineProvider);
-          if (!isOnline) return const OfflineHomeScreen();
+      routes: {
+        '/home' :(context) => const HomeScreen(),
+      },
+      home: InitScreen(),
+    );
+  }
+}
 
-          return StreamBuilder<User?>(
-            stream: FirebaseAuth.instance.authStateChanges(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const LoadingScreen();
-              }
 
-              if (snapshot.hasData) {
-                return const HomeScreen();
-              }
+class InitScreen extends StatelessWidget {
+  const InitScreen({super.key});
 
-              return const LoginScreen();
-            },
-          );
-        },
-      ),
+  @override
+  Widget build(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, child) {
+        final isOnline = ref.watch(isOnlineProvider);
+        if (!isOnline) return const OfflineHomeScreen();
+
+        return StreamBuilder<User?>(
+          stream: FirebaseAuth.instance.authStateChanges(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const LoadingScreen();
+            }
+
+            if (snapshot.hasData) {
+              return const HomeScreen();
+            }
+
+            return const LoginScreen();
+          },
+        );
+      },
     );
   }
 }
@@ -284,59 +300,4 @@ class LoadingScreen extends StatelessWidget {
   }
 }
 
-class HomeScreen extends ConsumerWidget {
-  const HomeScreen({super.key});
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final currentIndex = ref.watch(tabIndexProvider);
-
-    return SafeArea(
-      top: false,
-      child: Scaffold(
-        body: DefaultTabController(
-          length: 3,
-          initialIndex: currentIndex,
-          child: HookBuilder(
-            builder: (context) {
-              final tabController = DefaultTabController.of(context);
-
-              useEffect(() {
-                void listener() {
-                  ref.read(tabIndexProvider.notifier).setIndex(tabController.index);
-                }
-
-                tabController.addListener(listener);
-                return () => tabController.removeListener(listener);
-              }, [tabController]);
-
-              return SafeArea(
-                top: false,
-                child: Scaffold(
-                  bottomNavigationBar: TabBar(
-                    controller: tabController,
-                    tabs: const [
-                      Tab(icon: Icon(Icons.school), text: 'Learn'),
-                      Tab(icon: Icon(Icons.library_books), text: 'Flashcards'),
-                      // TODO (keep this tab for now) - Tab(icon: Icon(Icons.bar_chart), text: 'Progress'),
-                      Tab(icon: Icon(Icons.settings), text: 'Settings'),
-                    ],
-                  ),
-                  body: TabBarView(
-                    controller: tabController,
-                    children: const [
-                      GamesView(), 
-                      FlashcardScreen(), 
-                      // TODO (keep this tab for now) - ProgressScreen(), 
-                      SettingsScreen()
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ),
-    );
-  }
-}

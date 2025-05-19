@@ -1,3 +1,4 @@
+import 'package:Languador/widgets/common/webview_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -12,11 +13,7 @@ import 'package:Languador/providers/stack_provider.dart';
 import 'package:uuid/uuid.dart';
 
 class FlashCardBuilder extends StatelessWidget {
-  const FlashCardBuilder({
-    required this.ref, 
-    super.key, 
-    this.stackId,
-  });
+  const FlashCardBuilder({required this.ref, super.key, this.stackId});
 
   final WidgetRef ref;
   final String? stackId;
@@ -35,7 +32,8 @@ class FlashCardBuilder extends StatelessWidget {
         final targetLanguageState = useState<Language>(settings.targetLanguage);
         final nativeLanguageState = useState<Language>(settings.nativeLanguage);
 
-        Future<void> _addBulkFlashcards() async {
+        Future<bool> _addBulkFlashcards() async {
+          bool cardsAdded = false;
           final lines = bulkInputController.text.split('\n');
           for (final line in lines) {
             final parts = line.split('\\');
@@ -72,8 +70,9 @@ class FlashCardBuilder extends StatelessWidget {
                     srsNextReviewDate: newFlashcard.srsNextReviewDate,
                   );
                   await ref.read(flashcardStateProvider.notifier).addFlashcard(onlineFlashcard);
+                  cardsAdded = true;
                 }
-                
+
                 // Add to current stack if a stack is selected
                 if (stackId != null) {
                   await ref.read(stacksProvider.notifier).addFlashcardToStack(stackId!, id);
@@ -81,6 +80,50 @@ class FlashCardBuilder extends StatelessWidget {
               }
             }
           }
+          return cardsAdded;
+        }
+
+        Future<String?> _addFlashcardSingle(
+            TextEditingController wordController, 
+            ValueNotifier<Language> targetLanguageState, 
+            TextEditingController translationController, 
+            ValueNotifier<Language> nativeLanguageState
+        ) async {
+          final id = const Uuid().v4();
+          final newFlashcard = OfflineFlashcard(
+            id: id,
+            word: wordController.text,
+            targetLanguageCode: targetLanguageState.value.code,
+            translation: translationController.text,
+            nativeLanguageCode: nativeLanguageState.value.code,
+            srsNextReviewDate: DateTime.now().millisecondsSinceEpoch,
+            srsInterval: 1.0,
+            srsEaseFactor: 2.5,
+          );
+          
+          // Always save offline first
+          await ref.read(offlineFlashcardsProvider.notifier).addFlashcard(newFlashcard);
+          
+          // If online, also save to Firestore
+          if (ref.read(isOnlineProvider)) {
+            final onlineFlashcard = OnlineFlashcard(
+              id: newFlashcard.id,
+              word: newFlashcard.word,
+              targetLanguage: targetLanguageState.value,
+              translation: newFlashcard.translation,
+              nativeLanguage: nativeLanguageState.value,
+              srsInterval: newFlashcard.srsInterval,
+              srsEaseFactor: newFlashcard.srsEaseFactor,
+              srsNextReviewDate: newFlashcard.srsNextReviewDate,
+            );
+            await ref.read(flashcardStateProvider.notifier).addFlashcard(onlineFlashcard);
+          }
+          
+          // Add to current stack if a stack is selected
+          if (stackId != null) {
+            await ref.read(stacksProvider.notifier).addFlashcardToStack(stackId!, id);
+          }
+          return id;
         }
 
         return AlertDialog(
@@ -104,6 +147,22 @@ class FlashCardBuilder extends StatelessWidget {
                   ),
                 ),
               ),
+              TextButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder:
+                              (context) => WebViewScreen(
+                                title: 'Custom Flashcard Builder GPT',
+                                url:
+                                    'https://chatgpt.com/g/g-6828a6f0d3bc8191aa5d9fdb800f33bf-languador-flashcards-builder',
+                              ),
+                        ),
+                      );
+                    },
+                    child: const Text('Custom Flashcard Builder GPT'),
+                  ),
             ],
           ),
           content: Form(
@@ -112,6 +171,7 @@ class FlashCardBuilder extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  
                   if (!isBulkMode.value) ...[
                     // Single word mode UI
                     DropdownButtonFormField<Language>(
@@ -209,7 +269,7 @@ class FlashCardBuilder extends StatelessWidget {
                       maxLines: 8,
                       decoration: InputDecoration(
                         border: const OutlineInputBorder(),
-                        hintText: 'hello\\hola\nworld\\mundo\nbook\\libro',
+                        hintText: 'hola\\hello\nmundo\\world\nlibro\\book',
                         hintStyle: TextStyle(color: Colors.grey[400]),
                         helperText: 'Press Enter for a new line',
                         helperStyle: TextStyle(color: Colors.grey[600]),
@@ -239,46 +299,25 @@ class FlashCardBuilder extends StatelessWidget {
             TextButton(
               onPressed: () async {
                 if (formKey.currentState!.validate()) {
+                  bool cardsAdded = false;
+                  
                   if (isBulkMode.value) {
-                    await _addBulkFlashcards();
+                    cardsAdded = await _addBulkFlashcards();
                   } else {
-                    final id = const Uuid().v4();
-                    final newFlashcard = OfflineFlashcard(
-                      id: id,
-                      word: wordController.text,
-                      targetLanguageCode: targetLanguageState.value.code,
-                      translation: translationController.text,
-                      nativeLanguageCode: nativeLanguageState.value.code,
-                      srsNextReviewDate: DateTime.now().millisecondsSinceEpoch,
-                      srsInterval: 1.0,
-                      srsEaseFactor: 2.5,
+                    final flashcardId = await _addFlashcardSingle(
+                      wordController, 
+                      targetLanguageState, 
+                      translationController, 
+                      nativeLanguageState
                     );
-
-                    // Always save offline first
-                    await ref.read(offlineFlashcardsProvider.notifier).addFlashcard(newFlashcard);
-
-                    // If online, also save to Firestore
-                    if (ref.read(isOnlineProvider)) {
-                      final onlineFlashcard = OnlineFlashcard(
-                        id: newFlashcard.id,
-                        word: newFlashcard.word,
-                        targetLanguage: targetLanguageState.value,
-                        translation: newFlashcard.translation,
-                        nativeLanguage: nativeLanguageState.value,
-                        srsInterval: newFlashcard.srsInterval,
-                        srsEaseFactor: newFlashcard.srsEaseFactor,
-                        srsNextReviewDate: newFlashcard.srsNextReviewDate,
-                      );
-                      await ref.read(flashcardStateProvider.notifier).addFlashcard(onlineFlashcard);
-                    }
-                    
-                    // Add to current stack if a stack is selected
-                    if (stackId != null) {
-                      await ref.read(stacksProvider.notifier).addFlashcardToStack(stackId!, id);
-                    }
+                    cardsAdded = flashcardId != null;
                   }
+                  
+                  // Close the dialog first
                   if (context.mounted) {
                     Navigator.pop(context);
+                    
+                    // Show success message
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
@@ -287,6 +326,7 @@ class FlashCardBuilder extends StatelessWidget {
                         backgroundColor: Colors.green,
                       ),
                     );
+                    // Check for missing images after dialog is closed if cards were added
                   }
                 }
               },
@@ -297,4 +337,6 @@ class FlashCardBuilder extends StatelessWidget {
       },
     );
   }
+
+  
 }

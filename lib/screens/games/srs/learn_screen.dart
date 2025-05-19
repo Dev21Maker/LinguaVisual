@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'package:Languador/screens/router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:Languador/main.dart' show HomeScreen;
 import 'package:Languador/models/flashcard.dart';
@@ -372,11 +374,7 @@ class LearnScreen extends HookConsumerWidget {
                 sessionDuration: sessionDuration,
                 onContinue: () {
                   // Navigate back to the learn screen to start a new session
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(
-                      builder: (context) => const HomeScreen(),
-                    ),
-                  );
+                  context.pushReplacement('/home');
                 },
                 onLoadMoreCards: dueItems.isEmpty ? loadNextClosestCards : null,
               ),

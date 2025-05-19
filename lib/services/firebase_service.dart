@@ -166,6 +166,27 @@ class FirebaseService {
         .doc(id)
         .delete();
   }
+  
+  /// Gets a single card by ID, returns null if not found
+  Future<Map<String, dynamic>?> getCard(String id) async {
+    if (currentUser == null) throw Exception('User not authenticated');
+    try {
+      final doc = await _firestore
+          .collection('users')
+          .doc(currentUser!.uid)
+          .collection('cards')
+          .doc(id)
+          .get();
+      
+      if (doc.exists) {
+        return {...doc.data() as Map<String, dynamic>, 'id': doc.id};
+      }
+      return null;
+    } catch (e) {
+      print('Error getting card: $e');
+      rethrow;
+    }
+  }
 
   Future<List<OnlineFlashcard>> fetchDueCards() async {
     if (currentUser == null) throw Exception('User not authenticated');

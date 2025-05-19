@@ -10,6 +10,7 @@ import 'package:Languador/providers/flashcard_provider.dart';
 import 'package:Languador/providers/settings_provider.dart';
 import 'package:Languador/providers/locale_provider.dart';
 import 'package:Languador/providers/stack_provider.dart';
+import 'package:Languador/widgets/common/webview_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -187,16 +188,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   currentLanguage: settings.nativeLanguage,
                 ),
           ),
-          ListTile(
-            leading: const Icon(Icons.translate),
-            title: Text(l10n.stackListApplicationLocaleChangeTitle),
-            subtitle: Text(_getLanguageDisplayName(ref.watch(localeProvider))),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _showAppLanguageSelector(
-                  context: context,
-                  currentLocale: ref.watch(localeProvider),
-                ),
-          ),
+          // ListTile(
+          //   leading: const Icon(Icons.translate),
+          //   title: Text(l10n.stackListApplicationLocaleChangeTitle),
+          //   subtitle: Text(_getLanguageDisplayName(ref.watch(localeProvider))),
+          //   trailing: const Icon(Icons.chevron_right),
+          //   onTap: () => _showAppLanguageSelector(
+          //         context: context,
+          //         currentLocale: ref.watch(localeProvider),
+          //       ),
+          // ),
           
           const Divider(),
 
@@ -270,14 +271,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             leading: const Icon(Icons.description),
             title: Text(l10n.settingsPrivacyPolicyTile),
             onTap: () {
-              // TODO: Implement privacy policy view
+              // Open privacy policy in WebView
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => WebViewScreen(
+                    title: l10n.settingsPrivacyPolicyTile,
+                    url: 'https://www.termsfeed.com/live/4c25b5da-296c-4840-aed8-f3e40a53a64d',
+                  ),
+                ),
+              );
             },
           ),
           ListTile(
             leading: const Icon(Icons.contact_support),
             title: Text(l10n.settingsContactSupportTile),
             onTap: () {
-              // TODO: Implement support contact
+              // Open support contact page in WebView
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => WebViewScreen(
+                    title: l10n.settingsContactSupportTile,
+                    url: 'https://tally.so/r/nrpQdp',
+                  ),
+                ),
+              );
             },
           ),
 

@@ -17,7 +17,7 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 class FlashcardScreen extends HookConsumerWidget {
   const FlashcardScreen({super.key});
 
-  void _showAddFlashcardDialog(BuildContext context, WidgetRef ref, String? stackId) {
+  void _showAddFlashcardDialog(BuildContext context, WidgetRef ref, String? stackId) async {
     final flashcardsAsync = ref.read(flashcardStateProvider);
     final l10n = AppLocalizations.of(context)!;
     
@@ -39,13 +39,15 @@ class FlashcardScreen extends HookConsumerWidget {
       );
     } else {
       // Show the flashcard builder dialog if under the limit
-      showDialog(
+      await showDialog(
         context: context,
         builder: (context) => FlashCardBuilder(
           ref: ref,
           stackId: stackId, // Pass the current stack ID
         ),
-      );
+      ).then((value) {
+        ref.read(flashcardStateProvider.notifier).checkForMissingImages();
+      },);
     }
   }
 
